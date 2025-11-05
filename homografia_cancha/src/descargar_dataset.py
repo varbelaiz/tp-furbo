@@ -1,0 +1,4 @@
+import SoccerNet
+from SoccerNet.Downloader import SoccerNetDownloader
+
+mySoccerNetDownloader=SoccerNetDownloader(LocalDirectory="cancha_dataset")
