@@ -21,8 +21,8 @@ class SoccerNetDataset(Dataset):
                  split="test",
                  width=640,
                  height=360,
-                 mean="../resources/mean.npy",
-                 std="../resources/std.npy"):
+                 mean="resources/mean.npy",
+                 std="resources/std.npy"):
         self.mean = np.load(mean)
         self.std = np.load(std)
         self.width = width

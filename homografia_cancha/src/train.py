@@ -6,8 +6,8 @@ from tqdm import tqdm
 import argparse
 import os
 
-from dataloader import SoccerNetDataset
-from soccerpitch import SoccerPitch
+from src.dataloader import SoccerNetDataset
+from src.soccerpitch import SoccerPitch
 
 
 parser = argparse.ArgumentParser(description='Entrenar modelo de segmentación para SN-Calibration')
