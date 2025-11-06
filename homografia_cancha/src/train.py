@@ -43,7 +43,7 @@ def train_model():
     # --- INICIO DE MODIFICACIÓN: Cargar dataset de validación ---
     print("Cargando dataset de validación...")
     val_dataset = SoccerNetDataset(datasetpath=os.path.join(args.SoccerNet_path, 'dataset'), split="val") #
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=12, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=True)
     # --- FIN DE MODIFICACIÓN ---
 
     print("Cargando modelo DeeplabV3 (ResNet-50)...")
