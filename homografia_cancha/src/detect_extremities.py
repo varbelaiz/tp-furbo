@@ -261,16 +261,21 @@ if __name__ == "__main__":
                         help='width resolution of the images')
     parser.add_argument('--resolution_height', required=False, type=int, default=360,
                         help='height resolution of the images')
+    
+    parser.add_argument('--model_path', type=str, required=True, 
+                    help='Ruta a los pesos (.pth) de tu modelo de segmentación entrenado (Paso 1)')
+    
     args = parser.parse_args()
 
     lines_palette = [0, 0, 0]
     for line_class in SoccerPitch.lines_classes:
         lines_palette.extend(SoccerPitch.palette[line_class])
 
+    print(f"Cargando modelo de segmentación desde: {args.model_path}")
     calib_net = SegmentationNetwork(
-        "../resources/soccer_pitch_segmentation.pth",
-        "../resources/mean.npy",
-        "../resources/std.npy")
+    args.model_path,
+    "resources/mean.npy",
+    "resources/std.npy")
 
     dataset_dir = os.path.join(args.soccernet, args.split)
     if not os.path.exists(dataset_dir):

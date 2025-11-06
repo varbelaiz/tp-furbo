@@ -13,9 +13,9 @@ from src.soccerpitch import SoccerPitch
 parser = argparse.ArgumentParser(description='Entrenar modelo de segmentación para SN-Calibration')
 parser.add_argument('--SoccerNet_path', type=str, required=True, help='Ruta a la carpeta raíz de SoccerNet-Calibration')
 parser.add_argument('--epochs', type=int, default=50, help='Número de épocas de entrenamiento')
-parser.add_argument('--batch_size', type=int, default=4, help='Tamaño del lote (ajusta según la VRAM de tu GPU)')
+parser.add_argument('--batch_size', type=int, default=8, help='Tamaño del lote (ajusta según la VRAM de tu GPU)')
 parser.add_argument('--lr', type=float, default=0.001, help='Tasa de aprendizaje (Learning Rate)')
-parser.add_argument('--output_path', type=str, default='mi_modelo_entrenado.pth', help='Ruta donde se guardará el modelo entrenado')
+parser.add_argument('--output_path', type=str, default='default_model_path.pth', help='Ruta donde se guardará el modelo entrenado')
 args = parser.parse_args()
 
 def train_model():
@@ -24,7 +24,7 @@ def train_model():
 
     print("Cargando dataset de entrenamiento...")
     train_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="train")
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=12, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True)
     
     # print("Cargando dataset de validación...")
     # val_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="val")
@@ -38,6 +38,9 @@ def train_model():
     model.classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
     
     model.to(device)
+
+    print("Compilando el modelo con torch.compile()... (esto tarda un momento la primera vez)")
+    model = torch.compile(model)
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
