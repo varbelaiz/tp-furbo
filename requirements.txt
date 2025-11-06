@@ -1,0 +1,17 @@
+torch
+torchvision
+torchaudio
+
+numpy
+pillow
+tqdm
+SoccerNet
+opencv-python
+matplotlib
+tensorboard
+albumentations
+lsq-ellipse
+wandb
+google-cloud-storage
+kornia
+supervision

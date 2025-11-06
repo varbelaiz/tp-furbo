@@ -1,85 +1,45 @@
-# ---- Project specific ----
+# ---- Experiment output ----
 
-# Datasets are never committed
-data/**
-!data/**/
-!data/**/README.md
+# Trained models
+/models/
+modules/pitch_calibration/checkpoints
 
-# Trained weights and live training output
-runs/
-*.pt
+# Inference results
+/outputs/
+modules/pitch_calibration/results
+
+# Training logs and plots
+/logs/
+/results/
+modules/pitch_calibration/wandb
+modules/pitch_calibration/debug_heatmaps
+
+# Datasets and precomputed heatmaps
+modules/pitch_calibration/dataset/
 
 
 # ---- Python ----
 __pycache__/
 *.py[codz]
-*$py.class
-*.so
 
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-*.manifest
-*.spec
-
-pip-log.txt
-pip-delete-this-directory.txt
-
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
 .pytest_cache/
-
-# Environments
-.env
-.envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Type checkers and linters
 .mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
 .ruff_cache/
+.coverage
 
-# Jupyter / IPython
 .ipynb_checkpoints
-profile_default/
-ipython_config.py
+
+.env
+.venv
+venv/
+env/
 
 
-# ---- Editors and OS ----
+# ---- Media and archives ----
+*.mp4
+*.mkv
+*.zip
+
+
+# ---- OS ----
 .DS_Store
-.idea/
-.vscode/
-*.swp
