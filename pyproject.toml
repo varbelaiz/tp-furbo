@@ -1,0 +1,27 @@
+[project]
+name = "tp-furbo"
+version = "0.1.0"
+description = "Football match analysis on SoccerNet: detection, tracking, pitch keypoints and homography"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "lsq-ellipse>=2.2.1",
+    "matplotlib>=3.9.0",
+    "numpy==1.26.*",
+    "opencv-python>=4.8.0,<4.11.0",
+    "pandas>=2.3.3",
+    "pillow>=10.0.0",
+    "scikit-learn>=1.7.2",
+    "sentencepiece>=0.2.1",
+    "soccernet>=0.1.62",
+    "sports",
+    "supervision>=0.27.0",
+    "torch>=2.9.1",
+    "tqdm>=4.66.0",
+    "transformers>=4.57.1",
+    "ultralytics>=8.3.228",
+    "umap-learn>=0.5.9.post2",
+]
+
+[tool.uv.sources]
+sports = { git = "https://github.com/roboflow/sports.git" }
