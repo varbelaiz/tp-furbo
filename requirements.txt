@@ -1,8 +1,12 @@
-numpy~>1.21
-torch~=1.10.0
-torchvision~=0.11.1
-pillow~>9.0.0
-tqdm~=4.62.3
+--index-url https://download.pytorch.org/whl/cu118
+
+torch
+torchvision
+torchaudio
+
+numpy
+pillow
+tqdm
 SoccerNet>=0.1.23
-opencv-python~=4.5.5
-matplotlib~=3.5.1
+opencv-python
+matplotlib

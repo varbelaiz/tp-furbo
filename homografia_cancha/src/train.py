@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.models.segmentation import deeplabv3_resnet50, DeepLabV3_ResNet50_Weights
+from torchvision.models.segmentation import deeplabv3_resnet50
 from tqdm import tqdm
 import argparse
 import os
@@ -34,7 +34,7 @@ def train_model():
     
     num_classes = len(SoccerPitch.lines_classes) + 1 
     
-    model = deeplabv3_resnet50(weights=DeepLabV3_ResNet50_Weights.DEFAULT, progress=True)
+    model = deeplabv3_resnet50(pretrained=True, progress=True)
     model.classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
     
     model.to(device)
