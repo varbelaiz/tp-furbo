@@ -5,70 +5,139 @@ from torchvision.models.segmentation import deeplabv3_resnet50
 from tqdm import tqdm
 import argparse
 import os
+import numpy as np # Necesario para el promedio de loss
+from torch.utils.tensorboard import SummaryWriter # <-- 1. IMPORTAR TENSORBOARD
 
-from src.dataloader import SoccerNetDataset
-from src.soccerpitch import SoccerPitch
+from src.dataloader import SoccerNetDataset #
+from src.soccerpitch import SoccerPitch #
 
-
+# --- INICIO DE MODIFICACIÓN: Argumentos Mejorados ---
 parser = argparse.ArgumentParser(description='Entrenar modelo de segmentación para SN-Calibration')
-parser.add_argument('--SoccerNet_path', type=str, required=True, help='Ruta a la carpeta raíz de SoccerNet-Calibration')
+parser.add_argument('--SoccerNet_path', type=str, required=True, help='Ruta a la carpeta raíz de SoccerNet-Calibration (la que contiene /dataset)')
 parser.add_argument('--epochs', type=int, default=50, help='Número de épocas de entrenamiento')
-parser.add_argument('--batch_size', type=int, default=8, help='Tamaño del lote (ajusta según la VRAM de tu GPU)')
+parser.add_argument('--batch_size', type=int, default=16, help='Tamaño del lote (ajusta según la VRAM de tu GPU)')
 parser.add_argument('--lr', type=float, default=0.001, help='Tasa de aprendizaje (Learning Rate)')
-parser.add_argument('--output_path', type=str, default='default_model_path.pth', help='Ruta donde se guardará el modelo entrenado')
+parser.add_argument('--output_folder', type=str, default='./models/', help='Carpeta donde se guardarán los checkpoints')
 args = parser.parse_args()
+# --- FIN DE MODIFICACIÓN ---
 
 def train_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Entrenando en dispositivo: {device}")
 
+    # --- INICIO DE MODIFICACIÓN: Crear carpeta de salida ---
+    os.makedirs(args.output_folder, exist_ok=True)
+    # --- FIN DE MODIFICACIÓN ---
+
+    # --- 2. INICIALIZAR TENSORBOARD WRITER ---
+    log_dir = os.path.join(args.output_folder, 'tensorboard_logs')
+    writer = SummaryWriter(log_dir=log_dir)
+    print(f"Logs de TensorBoard se guardarán en: {log_dir}")
+    # --- FIN DE CAMBIO ---
+
     print("Cargando dataset de entrenamiento...")
-    train_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="train")
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    # Usamos el path del dataset, no el root del proyecto
+    train_dataset = SoccerNetDataset(datasetpath=os.path.join(args.SoccerNet_path, 'dataset'), split="train") #
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=12, pin_memory=True)
     
-    # print("Cargando dataset de validación...")
-    # val_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="val")
-    # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4)
+    # --- INICIO DE MODIFICACIÓN: Cargar dataset de validación ---
+    print("Cargando dataset de validación...")
+    val_dataset = SoccerNetDataset(datasetpath=os.path.join(args.SoccerNet_path, 'dataset'), split="val") #
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=12, pin_memory=True)
+    # --- FIN DE MODIFICACIÓN ---
 
     print("Cargando modelo DeeplabV3 (ResNet-50)...")
     
-    num_classes = len(SoccerPitch.lines_classes) + 1 
+    num_classes = len(SoccerPitch.lines_classes) + 1 #
     
-    model = deeplabv3_resnet50(pretrained=True, progress=True)
-    model.classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
+    model = deeplabv3_resnet50(pretrained=True, progress=True) #
+    model.classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1)) #
     
     model.to(device)
+    
+    # --- INICIO DE MODIFICACIÓN: Compilar modelo (opcional pero recomendado) ---
+    print("Compilando el modelo con torch.compile()...")
+    model = torch.compile(model) #
+    # --- FIN DE MODIFICACIÓN ---
 
-    print("Compilando el modelo con torch.compile()... (esto tarda un momento la primera vez)")
-    model = torch.compile(model)
+    criterion = torch.nn.CrossEntropyLoss() #
+    optimizer = optim.Adam(model.parameters(), lr=args.lr) #
 
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # --- INICIO DE MODIFICACIÓN: Trackeo del mejor modelo ---
+    best_val_loss = np.inf #
+    # --- FIN DE MODIFICACIÓN ---
 
     print(f"--- Iniciando entrenamiento por {args.epochs} épocas ---")
     for epoch in range(args.epochs):
+        
+        # --- Loop de Entrenamiento ---
         model.train()
         running_loss = 0.0
-        
-        progress_bar = tqdm(train_loader, desc=f"Época {epoch+1}/{args.epochs}")
+        progress_bar = tqdm(train_loader, desc=f"Época {epoch+1}/{args.epochs} [Train]")
         
         for images, masks in progress_bar:
             images = images.to(device)
             masks = masks.to(device).long()
+            
             optimizer.zero_grad()
             outputs = model(images)['out']
             loss = criterion(outputs, masks)
             loss.backward()
             optimizer.step()
+            
             running_loss += loss.item()
-            progress_bar.set_postfix(loss=running_loss/len(progress_bar))
+            progress_bar.set_postfix(train_loss=running_loss/len(progress_bar))
         
-        print(f"Época {epoch+1} completada. Pérdida promedio: {running_loss / len(train_loader)}")
+        avg_train_loss = running_loss / len(train_loader)
 
-        # Agregar lo mismo pero para val
+        # --- INICIO DE MODIFICACIÓN: Loop de Validación ---
+        model.eval()
+        val_loss = 0.0
+        val_progress_bar = tqdm(val_loader, desc=f"Época {epoch+1}/{args.epochs} [Valid]")
 
-    print(f"Entrenamiento finalizado. Guardando modelo en: {args.output_path}")
-    torch.save(model.state_dict(), args.output_path)
+        with torch.no_grad(): # No necesitamos calcular gradientes en validación
+            for images, masks in val_progress_bar:
+                images = images.to(device)
+                masks = masks.to(device).long()
+                
+                outputs = model(images)['out']
+                loss = criterion(outputs, masks)
+                
+                val_loss += loss.item()
+                val_progress_bar.set_postfix(val_loss=val_loss/len(val_progress_bar))
+
+        avg_val_loss = val_loss / len(val_loader)
+        
+        print(f"Época {epoch+1} completada. Train Loss: {avg_train_loss:.6f}, Val Loss: {avg_val_loss:.6f}")
+
+        # --- 3. LOGGEAR LOS GRÁFICOS ---
+        writer.add_scalar('Loss/train', avg_train_loss, epoch + 1)
+        writer.add_scalar('Loss/val', avg_val_loss, epoch + 1)
+        # --- FIN DE CAMBIO ---
+
+        # --- INICIO DE MODIFICACIÓN: Checkpointing ---
+        # Guardar un checkpoint de la última época
+        last_model_path = os.path.join(args.output_folder, "checkpoint_last.pth")
+        torch.save(model.state_dict(), last_model_path)
+
+        # Si esta es la MEJOR Val Loss hasta ahora, guardalo como "best"
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            best_model_path = os.path.join(args.output_folder, "checkpoint_best.pth")
+            torch.save(model.state_dict(), best_model_path)
+            print(f"¡Nuevo mejor modelo! Guardando en {best_model_path}")
+        # --- FIN DE MODIFICACIÓN ---
+
+    print("Entrenamiento finalizado.")
+    # (La línea de guardado original ya no es necesaria, 
+    # pero la dejamos por si acaso como "final")
+    final_model_path = os.path.join(args.output_folder, "modelo_final.pth")
+    torch.save(model.state_dict(), final_model_path)
+    print(f"Modelo final guardado en: {final_model_path}")
+
+    # --- 4. CERRAR EL WRITER ---
+    writer.close()
+    # --- FIN DE CAMBIO ---
 
 if __name__ == "__main__":
     train_model()
