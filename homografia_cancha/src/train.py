@@ -24,7 +24,7 @@ def train_model():
 
     print("Cargando dataset de entrenamiento...")
     train_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="train")
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=12, pin_memory=True)
     
     # print("Cargando dataset de validación...")
     # val_dataset = SoccerNetDataset(datasetpath=args.SoccerNet_path, split="val")
