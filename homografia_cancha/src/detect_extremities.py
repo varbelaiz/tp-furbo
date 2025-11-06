@@ -201,13 +201,42 @@ def synthesize_mask(semantic_mask, disk_radius):
 class SegmentationNetwork:
     def __init__(self, model_file, mean_file, std_file, num_classes=29, width=640, height=360):
         file_path = Path(model_file).resolve()
-        model = nn.DataParallel(deeplabv3_resnet50(pretrained=False, num_classes=num_classes))
+        
+        model = nn.DataParallel(deeplabv3_resnet50(
+            pretrained=False, 
+            num_classes=num_classes, 
+            aux_loss=True  #
+        ))
+
         self.init_weight(model, nn.init.kaiming_normal_,
                          nn.BatchNorm2d, 1e-3, 0.1,
                          mode='fan_in')
+        
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
         checkpoint = torch.load(str(file_path), map_location=self.device)
-        model.load_state_dict(checkpoint["model"])
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+
+        for k, v in checkpoint.items():
+            
+            if 'aux_classifier' in k:
+                continue
+
+            if k.startswith('_orig_mod.'):
+                name = k[len("_orig_mod."):] 
+                name = 'module.' + name 
+                new_state_dict[name] = v
+            else:
+                if not k.startswith('module.'):
+                    name = 'module.' + k
+                    new_state_dict[name] = v
+                else:
+                    new_state_dict[k] = v
+        
+        model.load_state_dict(new_state_dict, strict=False)
+        
         model.eval()
         self.model = model.to(self.device)
         file_path = Path(mean_file).resolve()

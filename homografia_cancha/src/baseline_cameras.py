@@ -173,12 +173,9 @@ if __name__ == "__main__":
 
                 camera_predictions = dict()
                 image_path = os.path.join(dataset_dir, frame)
-                
-                # --- INICIO MODIFICACIÓN ---
-                # 1. Cargar la imagen real
+            
                 cv_image = cv.imread(image_path)
                 cv_image = cv.resize(cv_image, (args.resolution_width, args.resolution_height))
-                # --- FIN MODIFICACIÓN ---
 
                 line_matches = []
                 potential_3d_2d_matches = {}
@@ -204,13 +201,9 @@ if __name__ == "__main__":
                     start = (int(p1[0]), int(p1[1]))
                     end = (int(p2[0]), int(p2[1]))
                     
-                    # --- INICIO MODIFICACIÓN ---
-                    # 2. Dibujar los keypoints (Magenta = 255, 0, 255)
-                    # En lugar de la línea, dibujamos círculos
                     color_magenta_bgr = (255, 0, 255)
-                    cv.circle(cv_image, start, 5, color_magenta_bgr, -1) # -1 para relleno
+                    cv.circle(cv_image, start, 5, color_magenta_bgr, -1)
                     cv.circle(cv_image, end, 5, color_magenta_bgr, -1)
-                    # --- FIN MODIFICACIÓN ---
 
                     line = np.cross(p1, p2)
                     if np.isnan(np.sum(line)) or np.isinf(np.sum(line)):
@@ -226,10 +219,7 @@ if __name__ == "__main__":
                     success, homography = estimate_homography_from_line_correspondences(line_matches, T1, T2)
                     if success:
                         
-                        # --- INICIO MODIFICACIÓN ---
-                        # 3. Dibujar la homografía (Cyan)
                         cv_image = draw_pitch_homography(cv_image, homography) #
-                        # --- FIN MODIFICACIÓN ---
 
                         cam = Camera(args.resolution_width, args.resolution_height)
                         success = cam.from_homography(homography)
@@ -254,12 +244,10 @@ if __name__ == "__main__":
                                 cam.refine_camera(point_matches)
                                 # cam.draw_colorful_pitch(cv_image, SoccerField.palette)
                                 
-                                # --- INICIO MODIFICACIÓN ---
                                 # 4. Mostrar la imagen
-                                print(f"Mostrando frame: {image_path}")
-                                cv.imshow("Resultado (Puntos Magenta, Homografia Cyan)", cv_image)
-                                cv.waitKey(0) # Presiona una tecla para continuar
-                                # --- FIN MODIFICACIÓN ---
+                                # print(f"Mostrando frame: {image_path}")
+                                # cv.imshow("Resultado (Puntos Magenta, Homografia Cyan)", cv_image)
+                                # cv.waitKey(0) # Presiona una tecla para continuar
 
                 if success:
                     camera_predictions = cam.to_json_parameters()
