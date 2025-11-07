@@ -1,0 +1,61 @@
+"""SoccerNet calibration data downloader.
+
+Downloads SoccerNet calibration dataset including field line annotations
+and camera calibration data for keypoint extraction and pose estimation.
+"""
+
+from pathlib import Path
+from typing import List, Union
+
+
+from src.data_prep.keypoints.constants import dataset_dir, soccernet_password
+from SoccerNet.Downloader import SoccerNetDownloader
+
+
+def download_calibration_data(
+    local_directory: Union[str, Path] = dataset_dir,
+    password: str = soccernet_password,
+    splits: List[str] = ["train", "valid", "test"],
+    tasks: List[str] = ["calibration", "calibration-2023"]
+) -> None:
+    """Download SoccerNet calibration datasets.
+    
+    Args:
+        local_directory: Local directory to save downloaded data
+        password: SoccerNet API password
+        splits: Dataset splits to download
+        tasks: Calibration tasks to download
+    """
+    print("Initializing SoccerNet downloader...")
+    
+    # Initialize SoccerNet downloader
+    downloader = SoccerNetDownloader(LocalDirectory=local_directory)
+    downloader.password = password
+    
+    print(f"  Local directory: {local_directory}")
+    print(f"  Splits: {splits}")
+    print(f"  Tasks: {tasks}")
+    
+    # Download each calibration task
+    for task in tasks:
+        print(f"\nDownloading {task} data...")
+        try:
+            downloader.downloadDataTask(task=task, split=splits)
+            print(f"  Successfully downloaded {task}")
+        except Exception as e:
+            print(f"  Error downloading {task}: {e}")
+    
+    print(f"\nCalibration data download completed!")
+
+
+def main() -> None:
+    """Main function to execute calibration data download."""
+    try:
+        download_calibration_data()
+    except Exception as e:
+        print(f"\nDownload failed: {e}")
+        raise
+
+
+if __name__ == "__main__":
+    main()
