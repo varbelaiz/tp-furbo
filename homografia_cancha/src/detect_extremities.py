@@ -28,7 +28,7 @@ def generate_class_synthesis(semantic_mask, radius):
     """
     buckets = dict()
     kernel = np.ones((5, 5), np.uint8)
-    semantic_mask = cv.erode(semantic_mask, kernel, iterations=1)
+    # semantic_mask = cv.erode(semantic_mask, kernel, iterations=1)
     for k, class_name in enumerate(SoccerPitch.lines_classes):
         mask = semantic_mask == k + 1
         if mask.sum() > 0:
@@ -335,7 +335,7 @@ if __name__ == "__main__":
                 if args.masks:
                     mask = Image.fromarray(semlines.astype(np.uint8)).convert('P')
                     mask.putpalette(lines_palette)
-                    mask_file = os.path.join(output_prediction_folder, frame)
+                    mask_file = os.path.join(output_prediction_folder, f"{frame_index}.png")
                     mask.save(mask_file)
                 skeletons = generate_class_synthesis(semlines, 6)
                 extremities = get_line_extremities(skeletons, 40, args.resolution_width, args.resolution_height)
