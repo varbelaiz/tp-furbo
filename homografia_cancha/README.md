@@ -1,8 +1,3 @@
-Claro. Qué raro, mi respuesta anterior tenía el *pipeline* completo.
-
-Debe haber sido un error de copiado. Aquí va el `README.md` completo de nuevo, desde el título hasta el último comando de `tmux`.
-
-````markdown
 # 🚀 Guía Rápida: Pipeline TPF Homografía
 
 Esta es una guía de inicio rápido para ejecutar el pipeline completo de entrenamiento e inferencia desde cero, asumiendo que la VM está limpia.
@@ -32,9 +27,11 @@ Sigue estos pasos en orden.
 
 ### Paso 0: Descargar el Dataset
 El script `descargar_dataset.py` baja los `.zip` a `temp/` y los descomprime en `dataset/`.
+
+
 ```bash
 python -m src.descargar_dataset
-````
+```
 
 ### Paso 1: Pre-Procesar las Máscaras
 
