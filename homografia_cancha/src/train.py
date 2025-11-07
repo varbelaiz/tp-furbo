@@ -65,7 +65,7 @@ def train_model():
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 'min', patience=3, factor=0.1, verbose=True
+        optimizer, 'min', patience=3, factor=0.1
     )
 
     best_val_loss = np.inf
