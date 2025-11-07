@@ -64,6 +64,10 @@ def train_model():
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 'min', patience=3, factor=0.1, verbose=True
+    )
+
     best_val_loss = np.inf
 
     print(f"--- Iniciando entrenamiento por {args.epochs} épocas ---")
@@ -109,9 +113,13 @@ def train_model():
         
         print(f"Época {epoch+1} completada. Train Loss: {avg_train_loss:.6f}, Val Loss: {avg_val_loss:.6f}")
 
+        scheduler.step(avg_val_loss)
+
         # Loggear los gráficos en TensorBoard
         writer.add_scalar('Loss/train', avg_train_loss, epoch + 1)
         writer.add_scalar('Loss/val', avg_val_loss, epoch + 1)
+        current_lr = optimizer.param_groups[0]['lr']
+        writer.add_scalar('LearningRate', current_lr, epoch + 1)
         writer.flush() # Forzar escritura a disco
 
         # Checkpointing

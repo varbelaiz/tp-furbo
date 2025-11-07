@@ -9,3 +9,4 @@ SoccerNet
 opencv-python
 matplotlib
 tensorboard
+albumentations
