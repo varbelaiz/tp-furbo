@@ -48,7 +48,7 @@ Usamos `tmux` para asegurar que el entrenamiento sobreviva si cerramos la termin
 1.  **Iniciar la sesión segura:**
 
     ```bash
-    tmux new -s "viernes loco"
+    tmux new -s "sesion"
     ```
 
 2.  **Lanzar el entrenamiento (DENTRO de `tmux`):**
@@ -102,11 +102,11 @@ Revisa la performance de tu modelo.
     ```
   * **Reconectarse a la sesión:**
     ```bash
-    tmux attach -t "viernes loco"
+    tmux attach -t "sesion"
     ```
   * **Matar una sesión (si se trabó):**
     ```bash
-    tmux kill-session -t "viernes loco"
+    tmux kill-session -t "sesion"
     ```
   * **Matar TODO `tmux`:**
     ```bash
