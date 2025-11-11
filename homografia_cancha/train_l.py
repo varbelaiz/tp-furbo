@@ -15,17 +15,15 @@ import socket
 from google.cloud import storage  
 from datetime import datetime
 
-# --- INICIO CAMBIOS KORNIA ---
 import kornia.augmentation as K
 import kornia.geometry.transform as K_T
-# --- FIN CAMBIOS KORNIA ---
 
 torch.backends.cudnn.benchmark = True 
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from utils.utils_train_l import train_one_epoch, validation_step
-from model.dataloader_l import SoccerNetCalibrationDataset # Asegúrate que este es el dataloader de lineas
+from model.dataloader_l import SoccerNetCalibrationDataset
 from model.cls_hrnet_l import get_cls_net
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -38,7 +36,6 @@ def find_free_port():
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # ... (Sin cambios aquí) ...
     parser.add_argument("--cfg", type=str, required=True, help="Path to the configuration file")
     parser.add_argument("--dataset", type=str, default='SoccerNet', help="Dataset name")
     parser.add_argument("--root_dir", type=str, required=True, help="Root directory")
@@ -65,7 +62,6 @@ def main(rank, args, world_size, port):
 
     gcs_bucket = None
     if rank == 0:
-        # ... (Sin cambios en GCS o WANDB) ...
         wandb.login()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         wandb.init(mode="online" if args.wandb_project else "offline", project=args.wandb_project,
@@ -82,12 +78,10 @@ def main(rank, args, world_size, port):
                 print(f"❌ Error al conectar con GCS Bucket: {e}")
                 print("El modelo se guardará solo localmente.")
                 gcs_bucket = None
-        # ...
 
     if args.dataset != "SoccerNet":
         raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
     
-    # IMPORTANTE: Dataloader AHORA NO APLICA TRANSFORMACIONES
     dataset_cls = SoccerNetCalibrationDataset
     training_set = dataset_cls(args.root_dir, "train", augment=True)
     validation_set = dataset_cls(args.root_dir, "val", augment=False)
@@ -100,19 +94,14 @@ def main(rank, args, world_size, port):
 
     cfg = yaml.safe_load(open(args.cfg, 'r'))
     
-    # --- INICIO CAMBIOS KORNIA ---
-    # Obtenemos la resolución de heatmaps pre-calculados (Fase 1)
-    height, width = cfg['MODEL']['HEATMAP_SIZE'] # Ej: 270, 480
+    height, width = 540, 960
     
-    # Definimos el pipeline de Kornia que se ejecutará en la V100
     data_transforms_gpu = nn.Sequential(
         K_T.Resize((height, width), antialias=True),
         K.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]).to(device),
                     std=torch.tensor([0.229, 0.224, 0.225]).to(device))
     ).to(device)
-    # Compilamos el pipeline de Kornia para velocidad extra
     compiled_data_transforms = torch.compile(data_transforms_gpu)
-    # --- FIN CAMBIOS KORNIA ---
 
     model = get_cls_net(cfg).to(device)
     if args.pretrained:
@@ -121,7 +110,7 @@ def main(rank, args, world_size, port):
     model = torch.compile(model)
     model = DDP(model, device_ids=[rank])
 
-    loss_fn = nn.MSELoss() # Esto es correcto para el modelo de líneas (sin mask)
+    loss_fn = nn.MSELoss() 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr0)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.patience, factor=args.factor,
                                                            mode='min')
@@ -131,23 +120,19 @@ def main(rank, args, world_size, port):
     for epoch in range(args.num_epochs):
         train_sampler.set_epoch(epoch)
         
-        # --- INICIO CAMBIOS KORNIA ---
-        # Pasamos el pipeline de transformaciones como argumento
         avg_loss = train_one_epoch(epoch + 1, train_loader, optimizer, loss_fn, model, device,
                                    compiled_data_transforms)
         avg_vloss, acc, prec, rec, f1 = validation_step(val_loader, loss_fn, model, device,
                                                        compiled_data_transforms)
-        # --- FIN CAMBIOS KORNIA ---
 
         scheduler.step(avg_vloss)
 
         if rank == 0:
-            # ... (Sin cambios en logging o guardado) ...
             print(f'LOSS train {avg_loss} valid {avg_vloss} Accuracy {acc} Precision {prec}')
             wandb.log({"train_loss": avg_loss, "val_loss": avg_vloss, "epoch": epoch + 1,
                        'lr': optimizer.param_groups[0]["lr"], 'Accuracy': acc, 'Precision': prec,
                        'Recall': rec, 'F1-score': f1})
-            # ... (resto del guardado)
+
             if avg_vloss < best_vloss:
                 best_vloss = avg_vloss
                 

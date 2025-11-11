@@ -2,7 +2,6 @@ import os
 import glob
 import torch
 import numpy as np
-# import torchvision.transforms as T  <- ELIMINADO
 from torch.utils.data import Dataset
 from PIL import Image
 import sys
@@ -14,21 +13,18 @@ class SoccerNetCalibrationDataset(Dataset):
     - Carga heatmaps .npz pre-calculados ('heatmap' y 'mask').
     - El train.py se encargará de mover a GPU y transformar.
     """
-    def __init__(self, root_dir, split, augment=False): # 'augment' ya no se usa
+    def __init__(self, root_dir, split, augment=False): 
         
         self.img_path = os.path.join(root_dir, split)
         self.kps_path = os.path.join(root_dir, f"{split}_keypoints_pn")
         
-        # Usamos 'sorted' para consistencia
         self.npz_files = sorted(glob.glob(os.path.join(self.kps_path, '*.npz')))
         
         if not self.npz_files:
             print(f"FATAL: No se encontraron archivos .npz en {self.kps_path}")
             sys.exit(1)
             
-        self.img_size = (960, 540) # (W, H) - Solo como referencia
-
-        # --- BLOQUE self.transform ELIMINADO ---
+        self.img_size = (960, 540) 
 
     def __len__(self):
         return len(self.npz_files)
@@ -42,19 +38,15 @@ class SoccerNetCalibrationDataset(Dataset):
         img_name = os.path.join(self.img_path, file_name + '.jpg')
 
         try:
-            # --- 1. Cargar Heatmaps PRE-CALCULADOS ---
             data = np.load(npz_path)
-            heatmap = data['heatmap'] # Específico para 'keypoints'
-            mask = data['mask']     # Específico para 'keypoints'
+            heatmap = data['heatmap'] 
+            mask = data['mask']     
 
-            # --- 2. Cargar Imagen como numpy array ---
             image = Image.open(img_name).convert('RGB')
-            img_np = np.array(image) # Shape (540, 960, 3), dtype=uint8
+            img_np = np.array(image) 
         
         except Exception as e:
             print(f"Error cargando datos (idx {idx}): {img_name} o {npz_path}. Error: {e}")
-            # Saltar al siguiente archivo si este está corrupto
             return self.__getitem__((idx + 1) % len(self))
 
-        # --- 3. Devolver arrays "crudos" (CPU) ---
         return img_np, heatmap, mask

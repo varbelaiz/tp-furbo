@@ -1,5 +1,4 @@
 import torch
-# import torchvision.transforms as T  <- ELIMINADO
 
 from tqdm import tqdm
 from time import sleep
@@ -7,7 +6,6 @@ from time import sleep
 from model.metrics import calculate_metrics_l, calculate_metrics_l_with_mask
 from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool_l
 
-# --- CAMBIO 1: Añadir 'transforms_gpu' a la firma ---
 def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, device, transforms_gpu, dataset="SoccerNet"):
     model.train(True)
     running_loss = 0.
@@ -17,30 +15,23 @@ def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, dev
         for i, data in tepoch:
             tepoch.set_description(f"Epoch {epoch_index}")
 
-            # --- CAMBIO 2: Reemplazar toda la lógica 'if/else' con Kornia ---
-            # data[0] = img_np [B, 540, 960, 3] (uint8)
-            # data[1] = heat_np [B, 24, 270, 480] (float32)
             img_np, heat_np = data
 
-            # Mover a GPU, permutar, y escalar imagen
             images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
-            # Mover target a GPU
+
             target = torch.from_numpy(heat_np).to(device, non_blocking=True)
 
-            # Aplicar Kornia transforms (Resize + Normalize) EN LA GPU
             input = transforms_gpu(images_gpu)
 
             optimizer.zero_grad()
             outputs = model(input)
-            loss = loss_fn(outputs, target) # Loss simple de MSE para líneas
-            # --- FIN CAMBIO 2 ---
+            loss = loss_fn(outputs, target) 
 
             loss.backward()
             optimizer.step()
 
-            # Gather data and report
             running_loss += loss.item()
-            samples += input.size()[0] # 'input' ahora es un tensor de GPU
+            samples += input.size()[0] 
 
             tepoch.set_postfix(loss=running_loss / samples)
 
