@@ -10,3 +10,4 @@ opencv-python
 matplotlib
 tensorboard
 albumentations
+lsq-ellipse
