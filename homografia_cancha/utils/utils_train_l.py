@@ -1,5 +1,5 @@
 import torch
-import torchvision.transforms as T
+# import torchvision.transforms as T  <- ELIMINADO
 
 from tqdm import tqdm
 from time import sleep
@@ -7,7 +7,8 @@ from time import sleep
 from model.metrics import calculate_metrics_l, calculate_metrics_l_with_mask
 from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool_l
 
-def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, device, dataset="SoccerNet"):
+# --- CAMBIO 1: Añadir 'transforms_gpu' a la firma ---
+def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, device, transforms_gpu, dataset="SoccerNet"):
     model.train(True)
     running_loss = 0.
     samples = 0
@@ -16,43 +17,39 @@ def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, dev
         for i, data in tepoch:
             tepoch.set_description(f"Epoch {epoch_index}")
 
-            if dataset != "SoccerNet":
-                input, target, mask = data[0].to(device), data[1].to(device), data[2].to(device)
+            # --- CAMBIO 2: Reemplazar toda la lógica 'if/else' con Kornia ---
+            # data[0] = img_np [B, 540, 960, 3] (uint8)
+            # data[1] = heat_np [B, 24, 270, 480] (float32)
+            img_np, heat_np = data
 
-                transform = T.Resize((540, 960))
-                input = transform(input)
+            # Mover a GPU, permutar, y escalar imagen
+            images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
+            # Mover target a GPU
+            target = torch.from_numpy(heat_np).to(device, non_blocking=True)
 
-                optimizer.zero_grad()
-                outputs = model(input)
-                loss = loss_fn(outputs, target, mask.unsqueeze(-1).unsqueeze(-1))
+            # Aplicar Kornia transforms (Resize + Normalize) EN LA GPU
+            input = transforms_gpu(images_gpu)
 
-            else:
-                input, target = data[0].to(device), data[1].to(device)
-
-                optimizer.zero_grad()
-                outputs = model(input)
-                loss = loss_fn(outputs, target)
-
+            optimizer.zero_grad()
+            outputs = model(input)
+            loss = loss_fn(outputs, target) # Loss simple de MSE para líneas
+            # --- FIN CAMBIO 2 ---
 
             loss.backward()
             optimizer.step()
 
             # Gather data and report
             running_loss += loss.item()
-            samples += input.size()[0]
+            samples += input.size()[0] # 'input' ahora es un tensor de GPU
 
             tepoch.set_postfix(loss=running_loss / samples)
-            sleep(0.1)
-
 
     avg_loss = running_loss / samples
-
     return avg_loss
 
 
-def validation_step(validation_loader, loss_fn, model, device, dataset="SoccerNet"):
+def validation_step(validation_loader, loss_fn, model, device, transforms_gpu, dataset="SoccerNet"):
     running_vloss = 0.0
-
     acc, prec, rec, f1 = 0, 0, 0, 0
     samples = 0
     model.eval()
@@ -60,29 +57,21 @@ def validation_step(validation_loader, loss_fn, model, device, dataset="SoccerNe
     with (torch.no_grad()):
         for i, vdata in tqdm(enumerate(validation_loader), total=len(validation_loader)):
 
-            if dataset != "SoccerNet":
-                input, target, mask = vdata[0].to(device), vdata[1].to(device), vdata[2].to(device)
+            img_np, heat_np = vdata
 
-                transform = T.Resize((540, 960))
-                input = transform(input)
+            images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
+            target = torch.from_numpy(heat_np).to(device, non_blocking=True)
 
-                voutputs = model(input)
-                vloss = loss_fn(voutputs, target, mask.unsqueeze(-1).unsqueeze(-1))
+            input = transforms_gpu(images_gpu)
+            
+            voutputs = model(input)
+            vloss = loss_fn(voutputs, target)
 
-                kp_gt = get_keypoints_from_heatmap_batch_maxpool_l(target[:,:-1,:,:], return_scores=True, max_keypoints=2)
-                kp_pred = get_keypoints_from_heatmap_batch_maxpool_l(voutputs[:,:-1,:,:], return_scores=True, max_keypoints=2)
-                metrics = calculate_metrics_l_with_mask(kp_gt, kp_pred, mask)
+            kp_gt = get_keypoints_from_heatmap_batch_maxpool_l(target[:,:-1,:,:], return_scores=True, max_keypoints=2)
+            kp_pred = get_keypoints_from_heatmap_batch_maxpool_l(voutputs[:,:-1,:,:], return_scores=True, max_keypoints=2)
+            metrics = calculate_metrics_l(kp_gt, kp_pred)
 
-            else:
-                input, target = vdata[0].to(device), vdata[1].to(device)
-                voutputs = model(input)
-                vloss = loss_fn(voutputs, target)
-
-                kp_gt = get_keypoints_from_heatmap_batch_maxpool_l(target[:,:-1,:,:], return_scores=True, max_keypoints=2)
-                kp_pred = get_keypoints_from_heatmap_batch_maxpool_l(voutputs[:,:-1,:,:], return_scores=True, max_keypoints=2)
-                metrics = calculate_metrics_l(kp_gt, kp_pred)
-
-            running_vloss += vloss
+            running_vloss += vloss.item() 
             samples += input.size()[0]
 
             acc += metrics[0]

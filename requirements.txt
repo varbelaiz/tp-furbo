@@ -13,3 +13,4 @@ albumentations
 lsq-ellipse
 wandb
 google-cloud-storage
+kornia
