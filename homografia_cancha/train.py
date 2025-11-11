@@ -9,25 +9,24 @@ import numpy as np
 import torch.nn as nn
 import torch.multiprocessing as mp
 import socket
-
-torch.backends.cudnn.benchmark = True
-
+from google.cloud import storage 
 from datetime import datetime
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
+
+torch.backends.cudnn.benchmark = True
+
 from utils.utils_train import train_one_epoch, validation_step
 from model.dataloader import SoccerNetCalibrationDataset
 from model.cls_hrnet import get_cls_net
 
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=np.exceptions.RankWarning)
-
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def find_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))  # Bind to an available port
+        s.bind(("", 0))
         return s.getsockname()[1]
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -44,16 +43,18 @@ def parse_args():
     parser.add_argument("--patience", type=int, default=8, help="Patience for LR scheduler")
     parser.add_argument("--factor", type=float, default=0.5, help="LR scheduler factor")
     parser.add_argument("--wandb_project", type=str, default='', help="Wandb project name")
+    parser.add_argument("--gcs_bucket", type=str, default='', help="GCS Bucket name for saving models")
     return parser.parse_args()
 
 
 def main(rank, args, world_size, port):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
-    torch.cuda.set_device(rank)  # Ensure each process uses the correct GPU
+    torch.cuda.set_device(rank)
     device = torch.device(f"cuda:{rank}")
     torch.distributed.init_process_group(backend="nccl", init_method=f"tcp://localhost:{port}", rank=rank,
                                          world_size=world_size)
 
+    gcs_bucket = None
     if rank == 0:
         wandb.login()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -62,25 +63,22 @@ def main(rank, args, world_size, port):
                            "batch_per_gpu": args.batch, "learning_rate_0": args.lr0,
                            "epochs": args.num_epochs, "pretrained": args.pretrained})
 
-    dataset_splits = {
-        "SoccerNet": ("train", "valid"),
-        "WorldCup14": ("train_val", "test"),
-        "TSWorldCup": ("train", "test"),
-        "WorldPose": ("train", "val")
-    }
-
-    if args.dataset not in dataset_splits:
-        raise ValueError("Invalid dataset name")
-
-    train_split, val_split = dataset_splits[args.dataset]
+        if args.gcs_bucket:
+            try:
+                storage_client = storage.Client()
+                gcs_bucket = storage_client.bucket(args.gcs_bucket)
+                print(f"✅ Conectado al bucket de GCS: {args.gcs_bucket}")
+            except Exception as e:
+                print(f"❌ Error al conectar con GCS Bucket: {e}")
+                print("El modelo se guardará solo localmente.")
+                gcs_bucket = None
 
     if args.dataset != "SoccerNet":
         raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
-    
     dataset_cls = SoccerNetCalibrationDataset
-    
-    training_set = dataset_cls(args.root_dir, train_split, augment=True)
-    validation_set = dataset_cls(args.root_dir, val_split, augment=False)
+
+    training_set = dataset_cls(args.root_dir, "train", augment=True)
+    validation_set = dataset_cls(args.root_dir, "valid", augment=False)
 
     train_sampler = DistributedSampler(training_set, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler = DistributedSampler(validation_set, num_replicas=world_size, rank=rank, shuffle=False)
@@ -93,7 +91,7 @@ def main(rank, args, world_size, port):
     if args.pretrained:
         model.load_state_dict(torch.load(args.pretrained, map_location=device))
 
-    model = torch.compile(model)
+    model = torch.compile(model) 
 
     model = DDP(model, device_ids=[rank])
 
@@ -118,7 +116,20 @@ def main(rank, args, world_size, port):
 
             if avg_vloss < best_vloss:
                 best_vloss = avg_vloss
-                torch.save(model.module.state_dict(), args.save_dir + f'_{timestamp}.pt')
+
+                local_save_path = args.save_dir + f'_{timestamp}.pt'
+                torch.save(model.module.state_dict(), local_save_path)
+                print(f"Modelo guardado localmente en: {local_save_path}")
+
+                if gcs_bucket:
+                    try:
+                        gcs_path = f"models/keypoints_best_epoch{epoch+1}.pt"
+                        blob = gcs_bucket.blob(gcs_path)
+                        blob.upload_from_filename(local_save_path)
+                        print(f"✅ Modelo subido a GCS: {gcs_path}")
+                    except Exception as e:
+                        print(f"❌ Error al subir a GCS: {e}")
+
                 loss_counter = 0
             else:
                 loss_counter += 1
@@ -127,14 +138,12 @@ def main(rank, args, world_size, port):
                 print(f'Early stopping at epoch {epoch + 1}')
                 break
 
-
 def launch_training():
     args = parse_args()
     gpus = list(map(int, args.cuda.split(',')))
     world_size = len(gpus)
-    port = find_free_port()  # Automatically find an available port
+    port = find_free_port()
     mp.spawn(main, args=(args, world_size, port), nprocs=world_size, join=True)
-
 
 if __name__ == "__main__":
     launch_training()
