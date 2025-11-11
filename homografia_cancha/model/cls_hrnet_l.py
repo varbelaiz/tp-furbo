@@ -307,7 +307,8 @@ class HighResolutionNet(nn.Module):
                 in_channels=final_inp_channels,
                 out_channels=config['MODEL']['NUM_JOINTS'],
                 kernel_size=extra['FINAL_CONV_KERNEL']),
-            nn.Softmax(dim=1)))
+            nn.Sigmoid()))
+            
 
 
 
