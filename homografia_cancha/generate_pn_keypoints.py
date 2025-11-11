@@ -191,10 +191,13 @@ def main():
         print(f"\n--- Procesando Directorio: {data_dir} ---")
         
         try:
+            ignore_list = ['match_info.json', 'per_match_info.json']
+
             annotation_files = [
-            f for f in os.listdir(data_dir) 
-            if f.endswith('.json') and f != 'match_info.json'
+                f for f in os.listdir(data_dir) 
+                if f.endswith('.json') and f not in ignore_list
             ]
+            
             if not annotation_files:
                 print(f"Error: No se encontraron archivos .json en {data_dir}")
                 continue
