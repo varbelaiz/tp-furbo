@@ -11,3 +11,4 @@ matplotlib
 tensorboard
 albumentations
 lsq-ellipse
+wandb

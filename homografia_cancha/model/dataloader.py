@@ -7,6 +7,7 @@ import torchvision.transforms as T
 from torch.utils.data import Dataset
 from PIL import Image
 import cv2
+import sys
 
 # Asumimos que esta función existe en tu carpeta utils/
 # La vi en tu screenshot: utils/utils_heatmap.py

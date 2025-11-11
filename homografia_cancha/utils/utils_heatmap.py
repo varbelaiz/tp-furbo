@@ -485,7 +485,51 @@ def complete_keypoints(kp_dict, lines_dict, w, h, normalize=False):
     return complete_dict, lines_dict
 
 
+def draw_label_map(img, pt, sigma, type='Gaussian'):
+    """
+    Dibuja un heatmap Gaussiano 2D en una imagen (array de numpy).
+    """
+    img_height, img_width = img.shape[0], img.shape[1]
+    
+    # Asegurarse de que el punto esté en enteros
+    pt = (int(pt[0]), int(pt[1]))
 
+    # Verificar límites
+    if pt[0] < 0 or pt[0] >= img_width or pt[1] < 0 or pt[1] >= img_height:
+        return img # Retorna la imagen sin modificar si el punto está fuera
 
+    # Tamaño del kernel Gaussiano
+    tmp_size = sigma * 3
+    ul = (int(pt[0] - tmp_size), int(pt[1] - tmp_size))
+    br = (int(pt[0] + tmp_size + 1), int(pt[1] + tmp_size + 1))
 
+    # Crear el kernel
+    size = 2 * tmp_size + 1
+    x = np.arange(0, size, 1, float)
+    y = x[:, np.newaxis]
+    x0 = y0 = size // 2
+    
+    # El Gaussiano 2D
+    g = np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
 
+    # Rango de coordenadas en la imagen donde se pegará el kernel
+    g_x_min = max(0, -ul[0])
+    g_x_max = min(br[0], img_width) - ul[0]
+    g_y_min = max(0, -ul[1])
+    g_y_max = min(br[1], img_height) - ul[1]
+
+    # Rango de coordenadas del heatmap
+    img_x_min = max(0, ul[0])
+    img_x_max = min(br[0], img_width)
+    img_y_min = max(0, ul[1])
+    img_y_max = min(br[1], img_height)
+
+    # Asegurarse de que la región sea válida
+    if g_x_max > g_x_min and g_y_max > g_y_min:
+        # Pegar el kernel en el heatmap (usando np.maximum)
+        img[img_y_min:img_y_max, img_x_min:img_x_max] = np.maximum(
+            img[img_y_min:img_y_max, img_x_min:img_x_max],
+            g[g_y_min:g_y_max, g_x_min:g_x_max]
+        )
+    
+    return img
