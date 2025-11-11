@@ -16,7 +16,7 @@ from datetime import datetime
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from utils.utils_train import train_one_epoch, validation_step
-from model.dataloader import SoccerNetCalibrationDataset, WorldCup2014Dataset, TSWorldCupDataset, WorldPoseDataset
+from model.dataloader import SoccerNetCalibrationDataset
 from model.cls_hrnet import get_cls_net
 from model.losses import MSELoss
 
