@@ -78,7 +78,7 @@ def main(rank, args, world_size, port):
     dataset_cls = SoccerNetCalibrationDataset
 
     training_set = dataset_cls(args.root_dir, "train", augment=True)
-    validation_set = dataset_cls(args.root_dir, "valid", augment=False)
+    validation_set = dataset_cls(args.root_dir, "val", augment=False)
 
     train_sampler = DistributedSampler(training_set, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler = DistributedSampler(validation_set, num_replicas=world_size, rank=rank, shuffle=False)
