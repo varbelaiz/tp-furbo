@@ -12,6 +12,11 @@ def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, dev
 
     with (tqdm(enumerate(training_loader), unit="batch", total=len(training_loader)) as tepoch):
         for i, data in tepoch:
+
+            if data is None:
+                print(f"Saltando batch {i} corrupto...")
+                continue
+
             tepoch.set_description(f"Epoch {epoch_index}")
             
             img_np, heat_np, mask_np = data

@@ -47,6 +47,6 @@ class SoccerNetCalibrationDataset(Dataset):
         
         except Exception as e:
             print(f"Error cargando datos (idx {idx}): {img_name} o {npz_path}. Error: {e}")
-            return self.__getitem__((idx + 1) % len(self))
+            return None
 
         return img_np, heatmap

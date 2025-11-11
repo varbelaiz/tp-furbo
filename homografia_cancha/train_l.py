@@ -52,6 +52,14 @@ def parse_args():
     parser.add_argument("--gcs_bucket", type=str, default='', help="GCS Bucket name for saving models")
     return parser.parse_args()
 
+def collate_fn_skip_corrupt(batch):
+    batch = [item for item in batch if item is not None]
+    if not batch:
+        return None 
+    
+    return torch.utils.data.dataloader.default_collate(batch)
+
+
 
 def main(rank, args, world_size, port):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
@@ -89,8 +97,8 @@ def main(rank, args, world_size, port):
     train_sampler = DistributedSampler(training_set, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler = DistributedSampler(validation_set, num_replicas=world_size, rank=rank, shuffle=False)
 
-    train_loader = DataLoader(training_set, batch_size=args.batch, sampler=train_sampler, num_workers=args.num_workers, pin_memory=True)
-    val_loader = DataLoader(validation_set, batch_size=args.batch, sampler=val_sampler, num_workers=args.num_workers, pin_memory=True)
+    train_loader = DataLoader(training_set, batch_size=args.batch, sampler=train_sampler, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_fn_skip_corrupt)
+    val_loader = DataLoader(validation_set, batch_size=args.batch, sampler=val_sampler, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_fn_skip_corrupt)
 
     cfg = yaml.safe_load(open(args.cfg, 'r'))
     
