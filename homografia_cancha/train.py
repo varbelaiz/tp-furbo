@@ -18,7 +18,6 @@ from torch.utils.data import DataLoader, DistributedSampler
 from utils.utils_train import train_one_epoch, validation_step
 from model.dataloader import SoccerNetCalibrationDataset
 from model.cls_hrnet import get_cls_net
-from model.losses import MSELoss
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=np.RankWarning)
@@ -74,12 +73,11 @@ def main(rank, args, world_size, port):
         raise ValueError("Invalid dataset name")
 
     train_split, val_split = dataset_splits[args.dataset]
-    dataset_cls = {
-        "SoccerNet": SoccerNetCalibrationDataset,
-        "WorldCup14": WorldCup2014Dataset,
-        "TSWorldCup": TSWorldCupDataset,
-        "WorldPose": WorldPoseDataset
-    }[args.dataset]
+    
+    if args.dataset != "SoccerNet":
+        raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
+    
+    dataset_cls = SoccerNetCalibrationDataset
 
     transform_module = __import__("model.transforms" if "SoccerNet" in args.dataset else "model.transformsWC",
                                   fromlist=["transforms", "no_transforms"])
