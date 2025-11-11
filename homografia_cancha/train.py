@@ -78,11 +78,9 @@ def main(rank, args, world_size, port):
         raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
     
     dataset_cls = SoccerNetCalibrationDataset
-
-    transform_module = __import__("model.transforms" if "SoccerNet" in args.dataset else "model.transformsWC",
-                                  fromlist=["transforms", "no_transforms"])
-    training_set = dataset_cls(args.root_dir, train_split, transform=transform_module.transforms)
-    validation_set = dataset_cls(args.root_dir, val_split, transform=transform_module.no_transforms)
+    
+    training_set = dataset_cls(args.root_dir, train_split, augment=True)
+    validation_set = dataset_cls(args.root_dir, val_split, augment=False)
 
     train_sampler = DistributedSampler(training_set, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler = DistributedSampler(validation_set, num_replicas=world_size, rank=rank, shuffle=False)
