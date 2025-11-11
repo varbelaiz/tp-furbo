@@ -85,6 +85,9 @@ def main(rank, args, world_size, port):
     model = get_cls_net(cfg).to(device)
     if args.pretrained:
         model.load_state_dict(torch.load(args.pretrained, map_location=device))
+
+    model = torch.compile(model)
+
     model = DDP(model, device_ids=[rank])
 
     loss_fn = nn.MSELoss()
