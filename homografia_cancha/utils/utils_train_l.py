@@ -53,6 +53,10 @@ def validation_step(validation_loader, loss_fn, model, device, transforms_gpu, d
     with (torch.no_grad()):
         for i, vdata in tqdm(enumerate(validation_loader), total=len(validation_loader)):
 
+            if vdata is None:
+                print(f"Saltando batch {i} corrupto...")
+                continue
+
             img_np, heat_np = vdata
 
             images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0

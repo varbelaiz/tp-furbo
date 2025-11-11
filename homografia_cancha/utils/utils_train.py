@@ -52,6 +52,10 @@ def validation_step(validation_loader, loss_fn, model, device, transforms_gpu):
 
     with torch.no_grad():
         for i, vdata in tqdm(enumerate(validation_loader), total=len(validation_loader)):
+
+            if vdata is None:
+                print(f"Saltando batch {i} corrupto...")
+                continue
             
             img_np, heat_np, mask_np = vdata
 
