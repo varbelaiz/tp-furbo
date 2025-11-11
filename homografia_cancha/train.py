@@ -3,6 +3,9 @@ import sys
 import yaml
 import wandb
 import torch
+
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+
 import argparse
 import warnings
 import numpy as np
@@ -83,8 +86,8 @@ def main(rank, args, world_size, port):
     train_sampler = DistributedSampler(training_set, num_replicas=world_size, rank=rank, shuffle=True)
     val_sampler = DistributedSampler(validation_set, num_replicas=world_size, rank=rank, shuffle=False)
 
-    train_loader = DataLoader(training_set, batch_size=args.batch, sampler=train_sampler, num_workers=args.num_workers)
-    val_loader = DataLoader(validation_set, batch_size=args.batch, sampler=val_sampler, num_workers=args.num_workers)
+    train_loader = DataLoader(training_set, batch_size=args.batch, sampler=train_sampler, num_workers=args.num_workers, pin_memory=True)
+    val_loader = DataLoader(validation_set, batch_size=args.batch, sampler=val_sampler, num_workers=args.num_workers, pin_memory=True)
 
     cfg = yaml.safe_load(open(args.cfg, 'r'))
     model = get_cls_net(cfg).to(device)
