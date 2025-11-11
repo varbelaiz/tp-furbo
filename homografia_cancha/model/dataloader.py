@@ -47,50 +47,43 @@ class SoccerNetCalibrationDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        # Cargar el .npz
         npz_path = self.npz_files[idx]
         file_name = os.path.splitext(os.path.basename(npz_path))[0]
-        
+
         try:
             kps_data = np.load(npz_path)
             keypoints = kps_data['keypoints_net1'] # Shape (58, 2)
         except Exception as e:
             print(f"Error cargando .npz: {npz_path}. {e}")
-            # Devolver un sample vacío en caso de error
             return self.__getitem__((idx + 1) % len(self))
 
-        # Cargar Imagen
+        # --- 1. Cargar Imagen ---
         img_name = os.path.join(self.img_path, file_name + '.jpg')
         image = Image.open(img_name).convert('RGB')
-        
-        sample = {'image': image}
-        if self.transform:
-            sample = self.transform(sample)
 
-        # --- Generar Heatmap (Target) y Máscara ---
+        # --- 2. Aplicar Transformaciones ---
+        # El 'self.transform' (de model/transforms.py) ahora hace TODO
+        # (incluyendo ToTensor y Normalize)
+        img_tensor = self.transform(image)
+
+        # --- 3. Generar Heatmap (Target) y Máscara ---
         heatmap = np.zeros((NUM_NET1_CHANNELS, self.heatmap_size[1], self.heatmap_size[0]), dtype=np.float32)
-        mask = np.zeros(NUM_NET1_CHANNELS - 1, dtype=np.float32) # 57 canales
+        mask = np.zeros(NUM_NET1_CHANNELS - 1, dtype=np.float32)
 
         scale_x = self.heatmap_size[0] / self.img_size[0]
         scale_y = self.heatmap_size[1] / self.img_size[1]
 
         for kp_id in range(NUM_NET1_CHANNELS - 1): # Iterar 0-56
             pt = keypoints[kp_id]
-            
+
             if pt[0] != -1.0:
                 x = int(pt[0] * scale_x)
                 y = int(pt[1] * scale_y)
-                
-                if 0 <= x < self.heatmap_size[0] and 0 <= y < self.heatmap_size[1]:
-                    # Usar la función de PnLCalib para dibujar el heatmap
-                    draw_label_map(heatmap[kp_id], (x, y), self.sigma)
-                    mask[kp_id] = 1.0 # Marcar este keypoint como presente
 
-        # Canal de Background
+                if 0 <= x < self.heatmap_size[0] and 0 <= y < self.heatmap_size[1]:
+                    draw_label_map(heatmap[kp_id], (x, y), self.sigma)
+                    mask[kp_id] = 1.0
+
         heatmap[NUM_NET1_CHANNELS - 1] = 1.0 - np.max(heatmap[:-1], axis=0)
 
-        # Retornar (input, target, mask) como espera utils_train.py
-        return sample['image'], torch.from_numpy(heatmap).float(), torch.from_numpy(mask).float()
-
-# --- Las clases WorldCup2014Dataset y TSWorldCupDataset se pueden eliminar ---
-# --- ya que no las estamos usando para este proyecto. ---
+        return img_tensor, torch.from_numpy(heatmap).float(), torch.from_numpy(mask).float()

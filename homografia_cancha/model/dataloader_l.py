@@ -6,6 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 import cv2
+import sys
 
 # Asumimos que esta función existe en tu carpeta utils/
 # La vi en tu screenshot: utils/utils_heatmap.py
@@ -46,10 +47,9 @@ class SoccerNetCalibrationDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        # Cargar el .npz
         npz_path = self.npz_files[idx]
         file_name = os.path.splitext(os.path.basename(npz_path))[0]
-        
+
         try:
             kps_data = np.load(npz_path)
             lines = kps_data['keypoints_net2'] # Shape (24, 2, 2)
@@ -57,15 +57,14 @@ class SoccerNetCalibrationDataset(Dataset):
             print(f"Error cargando .npz: {npz_path}. {e}")
             return self.__getitem__((idx + 1) % len(self))
 
-        # Cargar Imagen
+        # --- 1. Cargar Imagen ---
         img_name = os.path.join(self.img_path, file_name + '.jpg')
         image = Image.open(img_name).convert('RGB')
 
-        sample = {'image': image}
-        if self.transform:
-            sample = self.transform(sample)
+        # --- 2. Aplicar Transformaciones ---
+        img_tensor = self.transform(image)
 
-        # --- Generar Heatmap (Target) ---
+        # --- 3. Generar Heatmap (Target) ---
         heatmap = np.zeros((NUM_NET2_CHANNELS, self.heatmap_size[1], self.heatmap_size[0]), dtype=np.float32)
 
         scale_x = self.heatmap_size[0] / self.img_size[0]
@@ -74,25 +73,19 @@ class SoccerNetCalibrationDataset(Dataset):
         for line_id in range(NUM_NET2_CHANNELS - 1): # Iterar 0-22
             start_pt = lines[line_id, 0]
             end_pt = lines[line_id, 1]
-            
-            # Dibujar punto de inicio si es válido
+
             if start_pt[0] != -1.0:
                 x_s = int(start_pt[0] * scale_x)
                 y_s = int(start_pt[1] * scale_y)
                 if 0 <= x_s < self.heatmap_size[0] and 0 <= y_s < self.heatmap_size[1]:
                     draw_label_map(heatmap[line_id], (x_s, y_s), self.sigma)
 
-            # Dibujar punto final si es válido
             if end_pt[0] != -1.0:
                 x_e = int(end_pt[0] * scale_x)
                 y_e = int(end_pt[1] * scale_y)
                 if 0 <= x_e < self.heatmap_size[0] and 0 <= y_e < self.heatmap_size[1]:
                     draw_label_map(heatmap[line_id], (x_e, y_e), self.sigma)
 
-        # Canal de Background
         heatmap[NUM_NET2_CHANNELS - 1] = 1.0 - np.max(heatmap[:-1], axis=0)
-        
-        # Retornar (input, target) como espera utils_train_l.py
-        return sample['image'], torch.from_numpy(heatmap).float()
 
-# --- Las clases WorldCup2014Dataset y TSWorldCupDataset se pueden eliminar ---
+        return img_tensor, torch.from_numpy(heatmap).float()
