@@ -36,14 +36,14 @@ class SoccerNetCalibrationDataset(Dataset):
 
         if self.augment:
             self.transform = T.Compose([
-                T.Resize(self.img_size[1], self.img_size[0]),
+                T.Resize((self.img_size[1], self.img_size[0])), # (H, W) para T.Resize
                 T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
         else:
             self.transform = T.Compose([
-                T.Resize(self.img_size[1], self.img_size[0]),
+                T.Resize((self.img_size[1], self.img_size[0])), # (H, W) para T.Resize
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
