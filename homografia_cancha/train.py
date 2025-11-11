@@ -20,7 +20,7 @@ from model.dataloader import SoccerNetCalibrationDataset
 from model.cls_hrnet import get_cls_net
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-warnings.filterwarnings("ignore", category=np.RankWarning)
+warnings.filterwarnings("ignore", category=np.exceptions.RankWarning)
 
 
 def find_free_port():
@@ -73,7 +73,7 @@ def main(rank, args, world_size, port):
         raise ValueError("Invalid dataset name")
 
     train_split, val_split = dataset_splits[args.dataset]
-    
+
     if args.dataset != "SoccerNet":
         raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
     

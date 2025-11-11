@@ -14,12 +14,11 @@ from datetime import datetime
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from utils.utils_train_l import train_one_epoch, validation_step
-from model.dataloader_l import SoccerNetCalibrationDataset, WorldCup2014Dataset, TSWorldCupDataset, WorldPoseDataset
+from model.dataloader_l import SoccerNetCalibrationDataset
 from model.cls_hrnet_l import get_cls_net
-from model.losses import MSELoss
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-warnings.filterwarnings("ignore", category=np.RankWarning)
+warnings.filterwarnings("ignore", category=np.exceptions.RankWarning)
 
 
 def find_free_port():
@@ -68,12 +67,10 @@ def main(rank, args, world_size, port):
         "WorldPose": ("train", "val")
     }
     train_split, val_split = dataset_splits[args.dataset]
-    dataset_cls = {
-        "SoccerNet": SoccerNetCalibrationDataset,
-        "WorldCup14": WorldCup2014Dataset,
-        "TSWorldCup": TSWorldCupDataset,
-        "WorldPose": WorldPoseDataset
-    }[args.dataset]
+
+    if args.dataset != "SoccerNet":
+        raise ValueError(f"Este script está configurado solo para 'SoccerNet', no '{args.dataset}'")
+    dataset_cls = SoccerNetCalibrationDataset
 
     transform_module = __import__("model.transforms_l" if "SoccerNet" in args.dataset else "model.transformsWC_l",
                                   fromlist=["transforms", "no_transforms"])
@@ -92,7 +89,7 @@ def main(rank, args, world_size, port):
         model.load_state_dict(torch.load(args.pretrained, map_location=device))
     model = DDP(model, device_ids=[rank])
 
-    loss_fn = MSELoss()
+    loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr0)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.patience, factor=args.factor,
                                                            mode='min')
