@@ -1,39 +1,60 @@
 import numpy as np
 import glob
 import os
+from tqdm import tqdm
 
-files = glob.glob('dataset/train_keypoints_pn/*.npz')
-if not files:
-    print("¡Error! No se encontraron archivos .npz en dataset/train_keypoints_pn/")
+print("Iniciando inspección de TODOS los archivos .npz...")
+
+train_files = sorted(glob.glob('dataset/train_keypoints_pn/*.npz'))
+val_files = sorted(glob.glob('dataset/val_keypoints_pn/*.npz'))
+all_files = train_files + val_files
+
+if not all_files:
+    print("\n¡ERROR FATAL! No se encontraron archivos .npz en dataset/train_keypoints_pn/ o val_keypoints_pn/")
+    exit()
+
+print(f"Se inspeccionarán {len(all_files)} archivos .npz...")
+
+bad_files = []
+good_files = 0
+
+for f_path in tqdm(all_files, desc="Inspeccionando"):
+    try:
+        f = np.load(f_path)
+        
+        # --- Check Red 1 (Keypoints) ---
+        if 'heatmap' not in f:
+            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'heatmap')")
+            bad_files.append(f_path)
+            continue
+            
+        if 'mask' not in f:
+            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'mask')")
+            bad_files.append(f_path)
+            continue
+
+        # --- Check Red 2 (Líneas) ---
+        if 'heatmap_net2' not in f:
+            print(f"\n❌ Archivo Corrupto (Líneas): {f_path} (Falta la clave 'heatmap_net2')")
+            bad_files.append(f_path)
+            continue
+            
+        good_files += 1
+
+    except Exception as e:
+        print(f"\n🚨 Archivo Ilegible (Zip/Corrupto): {f_path}. Error: {e}")
+        bad_files.append(f_path)
+
+print("\n--- REPORTE DE INSPECCIÓN ---")
+print(f"Archivos Buenos: {good_files} de {len(all_files)}")
+print(f"Archivos Malos/Corruptos: {len(bad_files)}")
+
+if bad_files:
+    print("\nLista de archivos corruptos (primeros 50):")
+    for i, bad_f in enumerate(bad_files):
+        if i >= 50:
+            print(f"... y {len(bad_files) - 50} más.")
+            break
+        print(f"  {bad_f}")
 else:
-    f = np.load(files[0])
-    
-    # --- Check Red 1 (Keypoints) ---
-    if 'keypoints_net1' in f:
-        kps_net1 = f['keypoints_net1']
-        print(f"--- Inspeccionando {os.path.basename(files[0])} ---")
-        print("\n✅ Red 1 (Keypoints) encontrada.")
-        print(f"Shape: {kps_net1.shape} (Esperado: 58, 2)")
-        valid_count_net1 = np.sum(kps_net1[:, 0] != -1.0)
-        print(f"Puntos válidos: {valid_count_net1} de 57")
-        if valid_count_net1 == 0:
-            print("⚠️ Alerta: 0 puntos de keypoints encontrados.")
-        else:
-            print("  (Ej: ID 0:", kps_net1[0], ")")
-    else:
-        print("❌ Error: 'keypoints_net1' no encontrado en el .npz")
-
-    # --- Check Red 2 (Líneas) ---
-    if 'keypoints_net2' in f:
-        kps_net2 = f['keypoints_net2']
-        print("\n✅ Red 2 (Líneas) encontrada.")
-        print(f"Shape: {kps_net2.shape} (Esperado: 24, 2, 2)")
-        # Contar líneas válidas (donde el punto inicial 'x' no es -1.0)
-        valid_count_net2 = np.sum(kps_net2[:, 0, 0] != -1.0)
-        print(f"Líneas válidas: {valid_count_net2} de 23")
-        if valid_count_net2 == 0:
-             print("⚠️ Alerta: 0 líneas encontradas.")
-        else:
-            print("  (Ej: ID 0:", kps_net2[0], ")")
-    else:
-        print("❌ Error: 'keypoints_net2' no encontrado en el .npz")
+    print("\n✅ ¡Felicitaciones! Todos los archivos .npz son válidos.")
