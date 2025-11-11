@@ -32,7 +32,7 @@ class SoccerNetCalibrationDataset(Dataset):
         
         self.augment = augment
         self.img_size = (960, 540) # (W, H)
-        self.heatmap_size = (240, 135) # (W, H) - 1/4 de resolución
+        self.heatmap_size = (480, 270) # (W, H) - 1/2 de resolución
         self.sigma = 1 
 
         # Definir transformaciones internamente
