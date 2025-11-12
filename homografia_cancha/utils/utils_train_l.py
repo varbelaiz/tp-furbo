@@ -20,11 +20,10 @@ def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, dev
 
             tepoch.set_description(f"Epoch {epoch_index}")
 
-            img_np, heat_np = data
+            img_tensor, heat_tensor = data
 
-            images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
-
-            target = torch.from_numpy(heat_np).to(device, non_blocking=True)
+            images_gpu = img_tensor.to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
+            target = heat_tensor.to(device, non_blocking=True)
 
             input = transforms_gpu(images_gpu)
 
@@ -57,10 +56,10 @@ def validation_step(validation_loader, loss_fn, model, device, transforms_gpu, d
                 print(f"Saltando batch {i} corrupto...")
                 continue
 
-            img_np, heat_np = vdata
+            img_tensor, heat_tensor = vdata
 
-            images_gpu = torch.from_numpy(img_np).to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
-            target = torch.from_numpy(heat_np).to(device, non_blocking=True)
+            images_gpu = img_tensor.to(device, non_blocking=True).permute(0, 3, 1, 2).float() / 255.0
+            target = heat_tensor.to(device, non_blocking=True)
 
             input = transforms_gpu(images_gpu)
             
