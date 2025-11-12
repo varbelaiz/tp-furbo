@@ -7,7 +7,7 @@ import numpy as np
 from shapely.geometry import Point, Polygon, MultiPoint
 
 def calculate_metrics(gt, pred, mask, conf_th=0.1, dist_th=5):
-    geometry_mask = (mask[:, :-1] > 0).cpu()
+    geometry_mask = (mask > 0).cpu()
 
     pred_mask = torch.all((pred[:, :, :, -1] > conf_th), dim=-1)
     gt_mask = torch.all((gt[:, :, :, -1] > conf_th), dim=-1)
