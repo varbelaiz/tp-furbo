@@ -109,7 +109,8 @@ def main(rank, args, world_size, port):
         K.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]).to(device),
                     std=torch.tensor([0.229, 0.224, 0.225]).to(device))
     ).to(device)
-    compiled_data_transforms = torch.compile(data_transforms_gpu)
+
+    data_transforms_gpu = data_transforms_gpu    
 
     model = get_cls_net(cfg).to(device)
     if args.pretrained:
@@ -129,9 +130,9 @@ def main(rank, args, world_size, port):
         train_sampler.set_epoch(epoch)
         
         avg_loss = train_one_epoch(epoch + 1, train_loader, optimizer, loss_fn, model, device,
-                                   compiled_data_transforms)
+                                   data_transforms_gpu)
         avg_vloss, acc, prec, rec, f1 = validation_step(val_loader, loss_fn, model, device,
-                                                       compiled_data_transforms)
+                                                       data_transforms_gpu)
 
         scheduler.step(avg_vloss)
 
