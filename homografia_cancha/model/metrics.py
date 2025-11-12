@@ -26,7 +26,7 @@ def calculate_metrics(gt, pred, mask, conf_th=0.1, dist_th=5):
     false_negatives = (~pred_mask & gt_mask).sum().item()
 
     # Calculate precision, recall, and F1 score
-    accuracy = (true_positives + true_negatives) / geometry_mask.sum().item()
+    accuracy = (true_positives + true_negatives) / (geometry_mask.sum().item() + 1e-10)
     precision = true_positives / (true_positives + false_positives + 1e-10)
     recall = true_positives / (true_positives + false_negatives + 1e-10)
     f1 = 2 * (precision * recall) / (precision + recall + 1e-10)
@@ -58,7 +58,7 @@ def calculate_metrics_l(gt, pred, conf_th=0.1, dist_th=5):
     false_negatives = (~pred_mask & gt_mask).sum().item()
 
     # Calculate precision, recall, and F1 score
-    accuracy = (true_positives + true_negatives) / (gt.size()[1] * gt.size()[0])
+    accuracy = (true_positives + true_negatives) / (gt.size()[1] * gt.size()[0] + + 1e-10)
     precision = true_positives / (true_positives + false_positives + 1e-10)
     recall = true_positives / (true_positives + false_negatives + 1e-10)
     f1 = 2 * (precision * recall) / (precision + recall + 1e-10)
@@ -70,7 +70,7 @@ def calculate_metrics_l_with_mask(gt, pred, mask, conf_th=0.1, dist_th=5):
 
     #only works with batch 1. Should be adapted to batch > 1 in an organic way or just do a loop over batch
 
-    geometry_mask = (mask[:, :-1] > 0).cpu()
+    geometry_mask = (mask > 0).cpu()
 
     pred = pred[geometry_mask]
     gt = gt[geometry_mask]
@@ -97,7 +97,7 @@ def calculate_metrics_l_with_mask(gt, pred, mask, conf_th=0.1, dist_th=5):
     false_negatives = (~pred_mask & gt_mask).sum().item()
 
     # Calculate precision, recall, and F1 score
-    accuracy = (true_positives + true_negatives) / geometry_mask.sum().item()
+    accuracy = (true_positives + true_negatives) / (geometry_mask.sum().item() + 1e-10)
     precision = true_positives / (true_positives + false_positives + 1e-10)
     recall = true_positives / (true_positives + false_negatives + 1e-10)
     f1 = 2 * (precision * recall) / (precision + recall + 1e-10)
