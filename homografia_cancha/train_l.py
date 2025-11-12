@@ -20,6 +20,7 @@ import kornia.geometry.transform as K_T
 
 torch.backends.cudnn.benchmark = True 
 
+from model.losses import CombMSEAW
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from utils.utils_train_l import train_one_epoch, validation_step
@@ -119,7 +120,7 @@ def main(rank, args, world_size, port):
     model = torch.compile(model)
     model = DDP(model, device_ids=[rank])
 
-    loss_fn = nn.MSELoss() 
+    loss_fn = CombMSEAW(lambda1=1, lambda2=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr0)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.patience, factor=args.factor,
                                                            mode='min')
