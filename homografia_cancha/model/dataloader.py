@@ -39,8 +39,8 @@ class SoccerNetCalibrationDataset(Dataset):
 
         try:
             data = np.load(npz_path)
-            heatmap = data['heatmap'] 
-            mask = data['mask']     
+            heatmap = data['heatmap_net1']
+            mask = data['mask_net1']     
 
             image = Image.open(img_name).convert('RGB')
             img_np = np.array(image) 

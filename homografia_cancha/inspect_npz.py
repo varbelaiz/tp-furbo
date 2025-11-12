@@ -3,7 +3,7 @@ import glob
 import os
 from tqdm import tqdm
 
-print("Iniciando inspección de TODOS los archivos .npz...")
+print("Iniciando inspección de TODOS los archivos .npz (versión corregida)...")
 
 train_files = sorted(glob.glob('dataset/train_keypoints_pn/*.npz'))
 val_files = sorted(glob.glob('dataset/val_keypoints_pn/*.npz'))
@@ -23,13 +23,13 @@ for f_path in tqdm(all_files, desc="Inspeccionando"):
         f = np.load(f_path)
         
         # --- Check Red 1 (Keypoints) ---
-        if 'heatmap' not in f:
-            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'heatmap')")
+        if 'heatmap_net1' not in f:
+            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'heatmap_net1')")
             bad_files.append(f_path)
             continue
             
-        if 'mask' not in f:
-            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'mask')")
+        if 'mask_net1' not in f:
+            print(f"\n❌ Archivo Corrupto (Keypoints): {f_path} (Falta la clave 'mask_net1')")
             bad_files.append(f_path)
             continue
 
