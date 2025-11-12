@@ -74,6 +74,12 @@ def main(rank, args, world_size, port):
                            "batch_per_gpu": args.batch, "learning_rate_0": args.lr0,
                            "epochs": args.num_epochs, "pretrained": args.pretrained})
 
+        save_directory = os.path.dirname(args.save_dir)
+
+        if save_directory and not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+            print(f"📁 Directorio de checkpoints creado en: {save_directory}")
+
         if args.gcs_bucket:
             try:
                 storage_client = storage.Client()
