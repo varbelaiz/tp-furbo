@@ -30,8 +30,13 @@ def train_one_epoch(epoch_index, training_loader, optimizer, loss_fn, model, dev
             optimizer.zero_grad()
             outputs = model(input)
             
-            loss = loss_fn(outputs, target) * mask.unsqueeze(-1).unsqueeze(-1)
-            loss = loss.mean()
+            output_kps = outputs[:, :-1, :, :]
+            target_kps = target[:, :-1, :, :]
+            
+            mask_broadcast = mask.unsqueeze(-1).unsqueeze(-1)
+            
+            loss = loss_fn(output_kps, target_kps, mask_broadcast)
+
             loss.backward()
             optimizer.step()
 
@@ -66,8 +71,13 @@ def validation_step(validation_loader, loss_fn, model, device, transforms_gpu):
             input = transforms_gpu(images_gpu)
 
             voutputs = model(input)
-            vloss = loss_fn(voutputs, target) * mask.unsqueeze(-1).unsqueeze(-1)
-            vloss = vloss.mean()
+
+            output_kps = voutputs[:, :-1, :, :]
+            target_kps = target[:, :-1, :, :]
+
+            mask_broadcast = mask.unsqueeze(-1).unsqueeze(-1)
+
+            vloss = loss_fn(output_kps, target_kps, mask_broadcast)
 
             kp_gt = get_keypoints_from_heatmap_batch_maxpool(target[:,:-1,:,:], return_scores=True, max_keypoints=1)
             kp_pred = get_keypoints_from_heatmap_batch_maxpool(voutputs[:,:-1,:,:], return_scores=True, max_keypoints=1)

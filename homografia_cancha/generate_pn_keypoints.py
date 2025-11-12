@@ -1,41 +1,25 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-generate_pn_keypoints.py (Versión 4 - Pre-calcula Heatmaps)
-
-Script de Fase 1. Pre-calcula y guarda los heatmaps finales.
-"""
-
 import os
 import json
-import sys
-import warnings
 import shutil
+import warnings
 import argparse
-from collections import defaultdict
-import cv2 
 import numpy as np
 from tqdm import tqdm
-from ellipse import LsqEllipse 
+from collections import defaultdict
 
+from utils.utils_heatmap import draw_label_map
 from utils.utils_intersections import get_intersections
-from utils.utils_ellipse_helpers import INTERSECTON_TO_PITCH_POINTS, get_pitch
 
-try:
-    from utils.utils_heatmap import draw_label_map
-except ImportError:
-    print("Error: No se pudo encontrar 'draw_label_map' en 'utils/utils_heatmap.py'")
-    sys.exit(1)
 
 warnings.filterwarnings('ignore', category=np.exceptions.RankWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
+
 DATASET_DIRS = ['dataset/train', 'dataset/val']
 OUTPUT_DIRS = {
-    'dataset/train': 'dataset/train_keypoints_pn',
-    'dataset/val': 'dataset/val_keypoints_pn'
-}
-INVALID_COORDS = np.array([-1.0, -1.0], dtype=np.float32)
+                'dataset/train': 'dataset/train_keypoints_pn',
+                'dataset/val': 'dataset/val_keypoints_pn'
+            }
 
 # --- Configuración de Heatmap ---
 IMG_SIZE = (960, 540) # W, H
@@ -46,7 +30,6 @@ SIGMA = 1
 
 # --- Configuración Red 1 (Keypoints) ---
 NUM_NET1_CHANNELS = 58 
-NET1_ID_MAP = {point_name: point_id for point_id, point_name in INTERSECTON_TO_PITCH_POINTS.items()}
 
 # --- Configuración Red 2 (Líneas) ---
 NET2_LINE_NAMES = [
@@ -60,7 +43,7 @@ NET2_LINE_NAMES = [
     'Small rect. right top'
 ]
 NUM_NET2_CHANNELS = 24 
-INVALID_LINE = np.array([INVALID_COORDS, INVALID_COORDS], dtype=np.float32)
+
 
 parser = argparse.ArgumentParser(description="Generador de Keypoints (Fase 1 - PnLCalib)")
 parser.add_argument(
@@ -70,12 +53,14 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 if args.clean:
     print("🚩 Modo --clean activado: Borrando directorios antiguos...")
     for path in OUTPUT_DIRS.values():
         if os.path.exists(path):
             shutil.rmtree(path)
             print(f"Directorio borrado: {path}")
+
 
 def parse_soccernet_json(json_path):
     try:
@@ -84,8 +69,10 @@ def parse_soccernet_json(json_path):
     except Exception as e:
         print(f"\nAdvertencia: No se pudo leer el JSON {json_path}: {e}")
         return defaultdict(list)
+    
     points_dict = defaultdict(list)
     for json_key, points_list in annotations.items():
+
         if isinstance(points_list, list) and len(points_list) > 0:
             try:
                 converted_points = [
@@ -96,6 +83,7 @@ def parse_soccernet_json(json_path):
                     points_dict[json_key] = converted_points
             except Exception:
                 pass 
+
     return points_dict
 
 
@@ -171,6 +159,7 @@ def main():
         if not os.path.exists(data_dir):
             print(f"Advertencia: Directorio de entrada no encontrado: {data_dir}. Saltando.")
             continue
+
         if not os.path.exists(output_dir):
             print(f"Creando directorio de salida: {output_dir}")
             os.makedirs(output_dir)
@@ -199,7 +188,6 @@ def main():
                 continue
             
             try:
-                # El pre-cálculo de heatmaps ocurre aquí
                 heatmap_net1, mask_net1, heatmap_net2 = process_single_annotation(json_path)
                 
                 np.savez_compressed(

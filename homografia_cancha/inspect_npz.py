@@ -1,9 +1,8 @@
-import numpy as np
 import glob
-import os
+import numpy as np
 from tqdm import tqdm
 
-print("Iniciando inspección de TODOS los archivos .npz (versión FINAL, con chequeo de shape)...")
+print("Iniciando inspección de TODOS los archivos .npz ...")
 
 train_files = sorted(glob.glob('dataset/train_keypoints_pn/*.npz'))
 val_files = sorted(glob.glob('dataset/val_keypoints_pn/*.npz'))

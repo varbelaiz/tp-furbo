@@ -1,30 +1,29 @@
 import os
-import sys
 import yaml
 import wandb
 import torch
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
+import socket
 import argparse
 import warnings
 import numpy as np
 import torch.nn as nn
-import torch.multiprocessing as mp
-import socket
-from google.cloud import storage 
 from datetime import datetime
+import kornia.augmentation as K
+from google.cloud import storage 
+import torch.multiprocessing as mp
+import kornia.geometry.transform as K_T
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 
-import kornia.augmentation as K
-import kornia.geometry.transform as K_T
-
 torch.backends.cudnn.benchmark = True
 
-from utils.utils_train import train_one_epoch, validation_step
-from model.dataloader import SoccerNetCalibrationDataset
+from model.losses import CombMSEAW
 from model.cls_hrnet import get_cls_net
+from model.dataloader import SoccerNetCalibrationDataset
+from utils.utils_train import train_one_epoch, validation_step
 
 warnings.filterwarnings("ignore", category=np.exceptions.RankWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -46,7 +45,7 @@ def parse_args():
     parser.add_argument("--num_epochs", type=int, default=200, help="Training epochs")
     parser.add_argument("--pretrained", type=str, default='', help="Pretrained weights path")
     parser.add_argument("--lr0", type=float, default=0.001, help="Initial learning rate")
-    parser.add_argument("--patience", type=int, default=8, help="Patience for LR scheduler")
+    parser.add_argument("--patience", type=int, default=4, help="Patience for LR scheduler")
     parser.add_argument("--factor", type=float, default=0.5, help="LR scheduler factor")
     parser.add_argument("--wandb_project", type=str, default='', help="Wandb project name")
     parser.add_argument("--gcs_bucket", type=str, default='', help="GCS Bucket name for saving models")
@@ -111,13 +110,14 @@ def main(rank, args, world_size, port):
     data_transforms_gpu = data_transforms_gpu    
 
     model = get_cls_net(cfg).to(device)
+
     if args.pretrained:
         model.load_state_dict(torch.load(args.pretrained, map_location=device))
 
     model = torch.compile(model) 
     model = DDP(model, device_ids=[rank])
 
-    loss_fn = nn.MSELoss(reduction='mean') 
+    loss_fn = CombMSEAW(lambda1=1, lambda2=1).to(device)    
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr0)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=args.patience, factor=args.factor,
@@ -128,18 +128,15 @@ def main(rank, args, world_size, port):
     for epoch in range(args.num_epochs):
         train_sampler.set_epoch(epoch)
     
-        avg_loss = train_one_epoch(epoch + 1, train_loader, optimizer, loss_fn, model, device, 
-                                   data_transforms_gpu)
-        avg_vloss, acc, prec, rec, f1 = validation_step(val_loader, loss_fn, model, device, 
-                                                       data_transforms_gpu)
+        avg_loss = train_one_epoch(epoch + 1, train_loader, optimizer, loss_fn, model, device, data_transforms_gpu)
+        avg_vloss, acc, prec, rec, f1 = validation_step(val_loader, loss_fn, model, device, data_transforms_gpu)
         
         scheduler.step(avg_vloss)
 
         if rank == 0:
             print(f'LOSS train {avg_loss} valid {avg_vloss} Accuracy {acc} Precision {prec}')
-            wandb.log({"train_loss": avg_loss, "val_loss": avg_vloss, "epoch": epoch + 1,
-                       'lr': optimizer.param_groups[0]["lr"], 'Accuracy': acc, 'Precision': prec,
-                       'Recall': rec, 'F1-score': f1})
+
+            wandb.log({"train_loss": avg_loss, "val_loss": avg_vloss, "epoch": epoch + 1, 'lr': optimizer.param_groups[0]["lr"], 'Accuracy': acc, 'Precision': prec, 'Recall': rec, 'F1-score': f1})
 
             if avg_vloss < best_vloss:
                 best_vloss = avg_vloss
@@ -161,7 +158,7 @@ def main(rank, args, world_size, port):
             else:
                 loss_counter += 1
 
-            if loss_counter == 16:
+            if loss_counter == 8:
                 print(f'Early stopping at epoch {epoch + 1}')
                 break
 

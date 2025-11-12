@@ -12,38 +12,18 @@ import cv2
 import numpy as np
 from ellipse import LsqEllipse
 
-# --- Importaciones rotas eliminadas ---
-# ELIMINADO: from src.datatools.line import find_closest_points
-# ELIMINADO: from baseline.soccerpitch import SoccerPitch
-# ELIMINADO: pitch = SoccerPitch()
-# ELIMINADO: PITCH_POINTS = {**pitch.point_dict}
-# (Este archivo define su PROPIO PITCH_POINTS a continuación)
-
-# --- INICIO: Definición del Modelo de Campo (Falaleev/PnLCalib) ---
 
 PITCH_POINTS = {}
 
-# --- NOTA: Esta sección de 'pitch = SoccerPitch()' era incorrecta ---
-# El script original de Falaleev/PnLCalib define PITCH_POINTS
-# estáticamente, no importándolo de otro modelo.
-# Dejamos PITCH_POINTS como un dict vacío que se rellena
-# con las definiciones de 'circle_tangent_points' y 'INTERSECTON_TO_PITCH_POINTS'.
-# Para que 'circle_tangent_points' funcione, necesitamos valores base:
-
-# Valores estándar del modelo de campo (aproximados de SoccerPitch)
-# Requeridos para las funciones 'circle_tangent_points'
-# Estos valores deben coincidir con la lógica del 'baseline' si PnLCalib depende de él,
-# pero aquí los definimos para que sea autosuficiente.
-# Asumimos un origen (0,0) en el centro del campo.
 PITCH_POINTS['CENTER_MARK'] = np.array([0.0, 0.0, 0.0])
 CENTER_CIRCLE_RADIUS = 9.15
-PITCH_POINTS['T_TOUCH_AND_HALFWAY_LINES_INTERSECTION'] = np.array([0.0, -34.0, 0.0]) # Asumiendo ancho de 68m
-PITCH_POINTS['B_TOUCH_AND_HALFWAY_LINES_INTERSECTION'] = np.array([0.0, 34.0, 0.0])  # Asumiendo ancho de 68m
-PITCH_POINTS['L_PENALTY_MARK'] = np.array([-41.5, 0.0, 0.0]) # Asumiendo largo 105m -> (105/2 - 11)
+PITCH_POINTS['T_TOUCH_AND_HALFWAY_LINES_INTERSECTION'] = np.array([0.0, -34.0, 0.0]) 
+PITCH_POINTS['B_TOUCH_AND_HALFWAY_LINES_INTERSECTION'] = np.array([0.0, 34.0, 0.0])  
+PITCH_POINTS['L_PENALTY_MARK'] = np.array([-41.5, 0.0, 0.0]) 
 PITCH_POINTS['R_PENALTY_MARK'] = np.array([41.5, 0.0, 0.0])
-PITCH_POINTS['L_PENALTY_AREA_TL_CORNER'] = np.array([-36.5, -20.16, 0.0]) # (105/2 - 16.5), -(40.32/2)
+PITCH_POINTS['L_PENALTY_AREA_TL_CORNER'] = np.array([-36.5, -20.16, 0.0]) 
 PITCH_POINTS['L_PENALTY_AREA_TR_CORNER'] = np.array([-36.5, 20.16, 0.0])
-PITCH_POINTS['L_PENALTY_AREA_BR_CORNER'] = np.array([-52.5, 20.16, 0.0]) # -105/2
+PITCH_POINTS['L_PENALTY_AREA_BR_CORNER'] = np.array([-52.5, 20.16, 0.0]) 
 PITCH_POINTS['R_PENALTY_AREA_TL_CORNER'] = np.array([36.5, -20.16, 0.0])
 PITCH_POINTS['R_PENALTY_AREA_BL_CORNER'] = np.array([52.5, -20.16, 0.0])
 PITCH_POINTS['L_PENALTY_AREA_BL_CORNER'] = np.array([-52.5, -20.16, 0.0])
@@ -56,10 +36,9 @@ def circle_tangent_points(circle_center: Tuple[float, float],
                           point: Tuple[float, float]):
     hypotenuse = np.sqrt((point[0] - circle_center[0])**2
                          + (point[1] - circle_center[1])**2)
-    # Manejar caso donde el punto está dentro del círculo (evitar arccos > 1)
+    
     if hypotenuse <= radius:
-        # No se pueden calcular tangentes desde un punto interior
-        # Devolver puntos inválidos o NaNs para que fallen
+
         invalid_point = np.array([np.nan, np.nan, 0.0], dtype=float)
         return (invalid_point, invalid_point)
         
@@ -129,21 +108,19 @@ PITCH_POINTS['R_MIDDLE_PENALTY'][1] = 0.0
 
 
 def get_pitch():
-    # Rellenar los puntos restantes que no se calcularon dinámicamente
-    # (Esto es una simplificación; el script original tiene más)
-    PITCH_POINTS['L_GOAL_TL_POST'] = np.array([-52.5, -3.66, 2.44]) # Poste de gol (no en plano)
-    PITCH_POINTS['L_GOAL_TR_POST'] = np.array([-52.5, 3.66, 2.44]) # Poste de gol (no en plano)
+    PITCH_POINTS['L_GOAL_TL_POST'] = np.array([-52.5, -3.66, 2.44]) 
+    PITCH_POINTS['L_GOAL_TR_POST'] = np.array([-52.5, 3.66, 2.44]) 
     PITCH_POINTS['L_GOAL_BL_POST'] = np.array([-52.5, -3.66, 0.0])
     PITCH_POINTS['L_GOAL_BR_POST'] = np.array([-52.5, 3.66, 0.0])
-    PITCH_POINTS['L_GOAL_AREA_BR_CORNER'] = np.array([-47.0, 9.16, 0.0]) # 105/2 - 5.5
+    PITCH_POINTS['L_GOAL_AREA_BR_CORNER'] = np.array([-47.0, 9.16, 0.0]) 
     PITCH_POINTS['L_GOAL_AREA_TR_CORNER'] = np.array([-47.0, -9.16, 0.0])
     PITCH_POINTS['L_GOAL_AREA_BL_CORNER'] = np.array([-52.5, 9.16, 0.0])
     PITCH_POINTS['L_GOAL_AREA_TL_CORNER'] = np.array([-52.5, -9.16, 0.0])
     PITCH_POINTS['BL_PITCH_CORNER'] = np.array([-52.5, 34.0, 0.0])
     PITCH_POINTS['TL_PITCH_CORNER'] = np.array([-52.5, -34.0, 0.0])
     
-    PITCH_POINTS['R_GOAL_TL_POST'] = np.array([52.5, -3.66, 2.44]) # Poste de gol (no en plano)
-    PITCH_POINTS['R_GOAL_TR_POST'] = np.array([52.5, 3.66, 2.44]) # Poste de gol (no en plano)
+    PITCH_POINTS['R_GOAL_TL_POST'] = np.array([52.5, -3.66, 2.44]) 
+    PITCH_POINTS['R_GOAL_TR_POST'] = np.array([52.5, 3.66, 2.44]) 
     PITCH_POINTS['R_GOAL_BL_POST'] = np.array([52.5, -3.66, 0.0])
     PITCH_POINTS['R_GOAL_BR_POST'] = np.array([52.5, 3.66, 0.0])
     PITCH_POINTS['R_GOAL_AREA_BL_CORNER'] = np.array([47.0, -9.16, 0.0])
@@ -155,10 +132,10 @@ def get_pitch():
 
     PITCH_POINTS['T_HALFWAY_LINE_AND_CENTER_CIRCLE_INTERSECTION'] = np.array([0.0, -9.15, 0.0])
     PITCH_POINTS['B_HALFWAY_LINE_AND_CENTER_CIRCLE_INTERSECTION'] = np.array([0.0, 9.15, 0.0])
-    PITCH_POINTS['BL_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([-36.5, 7.86, 0.0]) # (Calculado)
-    PITCH_POINTS['TL_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([-36.5, -7.86, 0.0]) # (Calculado)
-    PITCH_POINTS['BR_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([36.5, 7.86, 0.0]) # (Calculado)
-    PITCH_POINTS['TR_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([36.5, -7.86, 0.0]) # (Calculado)
+    PITCH_POINTS['BL_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([-36.5, 7.86, 0.0]) 
+    PITCH_POINTS['TL_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([-36.5, -7.86, 0.0]) 
+    PITCH_POINTS['BR_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([36.5, 7.86, 0.0]) 
+    PITCH_POINTS['TR_16M_LINE_AND_PENALTY_ARC_INTERSECTION'] = np.array([36.5, -7.86, 0.0]) 
 
     return PITCH_POINTS
 
@@ -223,12 +200,8 @@ INTERSECTON_TO_PITCH_POINTS = {
     56: 'R_MIDDLE_PENALTY'
 }
 
-# Rellenar PITCH_POINTS con get_pitch() para asegurar que todas las claves existan
-# Esto resuelve la dependencia circular
 PITCH_POINTS.update(get_pitch())
 
-
-# Lines, which are perpendicular to the main axis of the pitch
 PERP_LINES: List[Tuple[int, int]] = [
     (0, 1),
     (2, 3),
@@ -256,14 +229,11 @@ POINTS_LEFT: List[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 31, 33,
 POINTS_RIGHT: List[int] = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
                            29, 30, 32, 34, 36, 38, 50, 51, 52, 53, 54, 55, 56]
 
-# Points, which are not on the playground (the crossbars)
 NOT_ON_PLANE = [0, 1, 24, 25]
 
 PITCH_POINTS_TO_INTERSECTON = {v: k for k, v
                                in INTERSECTON_TO_PITCH_POINTS.items() if v in PITCH_POINTS}
 
-# Info on all the conic points (tangent points and intersections between the
-# ellipses and lines)
 CONICS_KEYS = {
     'Circle central': {
         'CENTER_CIRCLE_TANGENT_TR': {
@@ -343,9 +313,6 @@ CONICS_KEYS = {
     }
 }
 
-
-# --- INICIO: CÓDIGO PARCHADO (reemplaza src.datatools.line) ---
-
 def find_closest_points(line_arr: np.ndarray, x: float, y: float, *args) \
         -> Optional[np.ndarray]:
     """
@@ -355,27 +322,21 @@ def find_closest_points(line_arr: np.ndarray, x: float, y: float, *args) \
     if line_arr is None or len(line_arr) == 0:
         return None
     distances = np.sqrt(np.sum((line_arr - np.array([x, y]))**2, axis=1))
-    # Retorna los 2 puntos más cercanos para el ajuste de línea
     closest_indices = np.argsort(distances)[:2]
     if len(closest_indices) < 2:
-        return None # No hay suficientes puntos
+        return None 
     return line_arr[closest_indices]
-
-# --- FIN: CÓDIGO PARCHADO ---
 
 
 def get_m(a, b, c, d, e, f, x0, y0) -> Tuple[float, float]:
     """Helper function for getting the tangent points."""
-    # ... (código original)
     A = 4*a*c*x0*y0 + 2*a*e*x0 - b**2*x0*y0 - b*d*x0 - b*e*y0 - 2*b*f\
         + 2*c*d*y0 + d*e
     
-    # Manejar raíces cuadradas de números negativos (cuando B^2 es NaN)
     sqrt_term = (-4*a*c*f + a*e**2 + b**2*f - b*d*e + c*d**2) \
                 * (a*x0**2 + b*x0*y0 + c*y0**2 + d*x0 + e*y0 + f)
     
     if sqrt_term < 0:
-        # El punto está dentro de la elipse, no hay tangentes reales
         return (np.nan, np.nan)
 
     B = 2*np.sqrt(sqrt_term)
@@ -389,7 +350,6 @@ def get_m(a, b, c, d, e, f, x0, y0) -> Tuple[float, float]:
 
 def get_x(a, b, c, d, e, m, x0, y0):
     """Helper function for getting the tangent points."""
-    # ... (código original)
     C = 2 * (a + b*m + c*m**2)
     if C == 0:
         return np.nan
@@ -405,12 +365,12 @@ def find_tangent_point(ellipse: List[float], point: Tuple[float, float],
     m = get_m(a, b, c, d, e, f, x0, y0)
     
     if np.isnan(m[idx]):
-        return (np.nan, np.nan) # Propagar NaN si el cálculo de m falló
+        return (np.nan, np.nan) 
 
     x = get_x(a, b, c, d, e, m[idx], x0, y0)
     
     if np.isnan(x):
-       return (np.nan, np.nan) # Propagar NaN si el cálculo de x falló
+       return (np.nan, np.nan)
 
     y = m[idx]*x+y0-m[idx]*x0
     return (x, y)
@@ -420,7 +380,7 @@ def add_conic_points(points: Dict[str, List[Tuple[float, float]]],
                      intersections: Dict[int, Tuple[float, float] | None],
                      img_size: Tuple[int, int] = (960, 540)):
     mask = []
-    # Populate known points
+
     for conic in CONICS_KEYS:
         ellipse = None
         if conic in points and len(points[conic]) > 4:
@@ -430,14 +390,12 @@ def add_conic_points(points: Dict[str, List[Tuple[float, float]]],
                 if len(reg.coefficients) == 6:
                     ellipse = reg.coefficients
             except Exception:
-                # LsqEllipse puede fallar con datos degenerados
                 ellipse = None
                 
         if ellipse is not None:
             for point_name in CONICS_KEYS[conic]:
                 proc = CONICS_KEYS[conic][point_name]
                 
-                # Asegurarse de que el punto esté en el mapeo
                 if point_name not in PITCH_POINTS_TO_INTERSECTON:
                     continue
                 inters_id = PITCH_POINTS_TO_INTERSECTON[point_name]
@@ -467,30 +425,26 @@ def add_conic_points(points: Dict[str, List[Tuple[float, float]]],
                                 proc['side']
                             )
 
-    # Build homography
-    # Add missing points from homography (incl. tangents)
     idxs = [i for i in intersections if intersections[i] is not None
             and i not in NOT_ON_PLANE]
     
-    # Mapear IDs a puntos 3D
     dst_points = []
     src_points_2d = []
     
     for i in idxs:
         point_name = INTERSECTON_TO_PITCH_POINTS.get(i)
         if point_name in PITCH_POINTS:
-            dst_points.append(PITCH_POINTS[point_name][:2]) # Coordenadas 3D (X, Y)
-            src_points_2d.append(intersections[i]) # Coordenadas 2D (x, y)
+            dst_points.append(PITCH_POINTS[point_name][:2]) 
+            src_points_2d.append(intersections[i]) 
 
     src = np.array(src_points_2d, dtype=np.float32)
     dst = np.array(dst_points, dtype=np.float32)
 
     filled_with_homography = False
-    if len(src) >= 4: # Necesitamos al menos 4 puntos
+    if len(src) >= 4: 
         try:
-            hom = get_homography(dst, src) # Nota: src y dst están invertidos
+            hom = get_homography(dst, src) 
             if hom is not None:
-                # Add only points not included in original lines intersections
                 for idx in INTERSECTON_TO_PITCH_POINTS.keys():
                     if idx > 29 and (idx not in intersections
                                      or intersections[idx] is None):
@@ -498,11 +452,6 @@ def add_conic_points(points: Dict[str, List[Tuple[float, float]]],
                         point_name = INTERSECTON_TO_PITCH_POINTS.get(idx)
                         if point_name in PITCH_POINTS:
                             world_p = PITCH_POINTS[point_name]
-                            
-                            # (Invertir homografía para DLT: 3D -> 2D)
-                            # Necesitamos H que mapea 3D (dst) a 2D (src)
-                            # La homografía correcta es (3D_points, 2D_points)
-                            # get_homography(dst, src) es 3D->2D
                             
                             img_p = cv2.perspectiveTransform(
                                 np.array([[world_p[:2]]], dtype=np.float32), hom
@@ -518,7 +467,6 @@ def add_conic_points(points: Dict[str, List[Tuple[float, float]]],
                              or intersections[idx] is None):
                 mask.append(idx)
 
-    # Clean up points beyond image
     for i in INTERSECTON_TO_PITCH_POINTS:
         if i not in intersections:
             intersections[i] = None
@@ -529,9 +477,9 @@ def select_intersect(res, points: Dict[str, List[Tuple[float, float]]],
                      img_size: Tuple[int, int], circle: str = 'Circle central',
                      line: str = 'Middle line',
                      inters_type: str = 'Top'):
-    # ... (código original)
+    
     if res is None or len(res) < 2:
-        return None # No hay suficientes puntos de intersección
+        return None 
         
     p1 = res[0].real
     p2 = res[1].real
@@ -558,7 +506,7 @@ def select_intersect(res, points: Dict[str, List[Tuple[float, float]]],
         return bottom
     elif inters_type == 'Top':
         return top
-    return None # Tipo de intersección no reconocido
+    return None 
 
 
 def ellipse_line_intersect(ellipse, line: np.ndarray) -> np.ndarray | None:
@@ -583,7 +531,7 @@ def ellipse_line_intersect(ellipse, line: np.ndarray) -> np.ndarray | None:
                 int_x, int_y = quadratic_linear_intersection(
                     *conic_coeffs, a, b)
             except np.linalg.LinAlgError:
-                 return None # Polyfit falló
+                 return None 
 
         if len(int_x) > 0:
             valid_results = []
@@ -596,27 +544,23 @@ def ellipse_line_intersect(ellipse, line: np.ndarray) -> np.ndarray | None:
 
                 l_line = find_closest_points(line, x, y)
 
-                # --- INICIO DEL PARCHE INTELIGENTE ---
                 if l_line is not None:
                     l_int_x, l_int_y = [], []
                     try:
-                        # Causa del RankWarning: chequear si la línea de refinamiento es vertical
                         if np.isclose(l_line[0, 0], l_line[1, 0], atol=0.5):
-                            # Es vertical, usar find_conic_y
                             l_int_x, l_int_y = find_conic_y(*conic_coeffs, l_line[0, 0])
                         else:
-                            # Es seguro usar polyfit
                             l_a, l_b = np.polyfit(
                                 l_line[:, 0], l_line[:, 1], 1)
                             l_int_x, l_int_y = quadratic_linear_intersection(
                                 *conic_coeffs, l_a, l_b)
                     except Exception:
-                        pass # La matemática aún puede fallar
+                        pass 
 
                     if len(l_int_x) > 0:
                         valid_intersections = [(lx, ly) for lx, ly in zip(l_int_x, l_int_y) if not (np.isnan(lx) or np.isnan(ly))]
                         if not valid_intersections:
-                            valid_results.append((x, y)) # Usar el original
+                            valid_results.append((x, y)) 
                             continue
 
                         l_int_x_valid, l_int_y_valid = zip(*valid_intersections)
@@ -624,21 +568,19 @@ def ellipse_line_intersect(ellipse, line: np.ndarray) -> np.ndarray | None:
                         l_idx = np.argmin(dist)
                         valid_results.append((l_int_x_valid[l_idx], l_int_y_valid[l_idx]))
                     else:
-                         valid_results.append((x, y)) # Usar el original
+                         valid_results.append((x, y))
                 else:
-                    valid_results.append((x, y)) # Usar el original
-                # --- FIN DEL PARCHE INTELIGENTE ---
-
+                    valid_results.append((x, y)) 
+                
             if valid_results:
                 res = np.array(valid_results)
     return res
 
 
 def sort_conic_inters(p1, p2, lr: bool = True):
-    # ... (código original)
     dx = abs(p1[0] - p2[0])
     dy = abs(p1[1] - p2[1])
-    if dy < 1.0 or (dx > 0 and dy > 0 and dx/dy > 10): # Evitar división por cero
+    if dy < 1.0 or (dx > 0 and dy > 0 and dx/dy > 10):
         if p1[0] < p2[0]:
             bottom, top = p2, p1
         else:
@@ -655,9 +597,6 @@ def sort_conic_inters(p1, p2, lr: bool = True):
 
 
 def get_homography(src, dst, threshold: float = 5.0):
-    # src = Puntos 3D (en el plano 2D, así que (N, 2))
-    # dst = Puntos 2D (en la imagen, (N, 2))
-    # cv2.findHomography espera (N, 1, 2)
     src_pts = np.array(src).reshape(-1, 1, 2)
     dst_pts = np.array(dst).reshape(-1, 1, 2)
     
@@ -672,22 +611,20 @@ def quadratic_linear_intersection(a, b, c, d, e, f, k, h)\
     def y(x):
         return k*x+h
     
-    # Coeficientes de la cuadrática en x
     A = a + b*k + c*k**2
     B = b*h + 2*c*k*h + d + e*k
     C = c*h**2 + h*e + f
 
-    if A == 0: # Si A es cero, no es una cuadrática
+    if A == 0: 
         if B != 0:
             x_root = -C / B
             x_intersections = [x_root]
         else:
-            x_intersections = [] # Sin intersección (o líneas coincidentes)
+            x_intersections = []
     else:
-        # Usar np.roots para estabilidad
+        
         x_intersections = list(np.roots([A, B, C]))
     
-    # Filtrar raíces complejas (solo queremos intersecciones reales)
     x_intersections = [x.real for x in x_intersections if np.isreal(x)]
 
     y_intersections = [y(x) for x in x_intersections]
@@ -695,8 +632,7 @@ def quadratic_linear_intersection(a, b, c, d, e, f, k, h)\
 
 
 def find_conic_y(a, b, c, d, e, f, x):
-    # ... (código original)
-    # Coeficientes de la cuadrática en y
+   
     A = c
     B = b*x + e
     C = a*x**2 + d*x + f
@@ -710,7 +646,6 @@ def find_conic_y(a, b, c, d, e, f, x):
     else:
         y_intersections = list(np.roots([A, B, C]))
 
-    # Filtrar raíces complejas
     y_intersections = [y.real for y in y_intersections if np.isreal(y)]
     
     x_intersections = [x] * len(y_intersections)
