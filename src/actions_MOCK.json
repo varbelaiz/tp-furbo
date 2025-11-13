@@ -1,0 +1,10 @@
+{
+  "frame_0100": {
+    "action": "Pass",
+    "duration": 45
+  },
+  "frame_0200": {
+    "action": "Shot",
+    "duration": 60
+  }
+}

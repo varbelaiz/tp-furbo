@@ -1,53 +1,64 @@
 import json
 import numpy as np
+import os
 
 NUM_FRAMES = 270
 DETECTIONS_FILE = "detections_MOCK.json"
 CALIBRATION_FILE = "calibration_MOCK.json"
+ACTIONS_FILE = "actions_MOCK.json" 
 
 print(f"Generando {NUM_FRAMES} frames de datos mock...")
 
 all_detections = {}
 all_calibrations = {}
+all_actions = {} 
 
 # --- Configuración de la Calibración (Fácil) ---
-# La homografía inversa es la matriz identidad para todos los frames
 identity_matrix = np.eye(3).tolist()
 calib_data = {"homography_inverse": identity_matrix}
 
 # --- Configuración de Detecciones (Con Movimiento) ---
 # Coordenadas 3D (en metros) iniciales
-player_2_pos = np.array([0.0, 0.0])         # Centro del campo
-player_3_pos = np.array([-41.5, 0.0])      # Penal izquierdo
+player_2_pos = np.array([0.0, 0.0])       # Centro del campo
+player_3_pos = np.array([-41.5, 0.0])    # Penal izquierdo
+ball_pos = np.array([5.0, 5.0])          # Pelota
 
-# Vectores de movimiento (metros por frame)
-player_2_vel = np.array([0.2, 0.1])      # Moviéndose en diagonal
-player_3_vel = np.array([0.0, -0.15])    # Moviéndose hacia la línea de banda
+# --- CAMBIO: Velocidades reducidas ---
+player_2_vel = np.array([0.1, 0.05])     # Moviéndose en diagonal
+player_3_vel = np.array([0.0, -0.1])     # Moviéndose hacia la línea de banda
+ball_vel = np.array([-0.05, 0.1])        # Pelota moviéndose
 
 # --- Bucle Principal de Generación ---
 for i in range(NUM_FRAMES):
-    frame_key = f"frame_{i:04d}" # Formato "frame_0000", "frame_0001", etc.
+    frame_key = f"frame_{i:04d}" 
     
     # 1. Guardar la calibración (siempre la misma)
     all_calibrations[frame_key] = calib_data
     
     # 2. Actualizar y guardar las detecciones
-    
-    # El truco: guardamos las coordenadas 3D (metros) en el campo 'bbox'
-    # para que main.py las lea.
     p2_x, p2_y = player_2_pos
     p3_x, p3_y = player_3_pos
+    b_x, b_y = ball_pos 
     
     detections_list = [
-        {"id": 2, "bbox": [p2_x, p2_y, p2_x, p2_y]},
-        {"id": 3, "bbox": [p3_x, p3_y, p3_x, p3_y]}
+        {"id": 0, "bbox": [b_x, b_y, b_x, b_y], "jersey_number": None}, 
+        {"id": 2, "bbox": [p2_x, p2_y, p2_x, p2_y], "jersey_number": "7"},
+        {"id": 3, "bbox": [p3_x, p3_y, p3_x, p3_y], "jersey_number": "5"}
     ]
-    
     all_detections[frame_key] = detections_list
     
-    # 3. Mover los jugadores para el próximo frame
+    # 3. Mover los jugadores y la pelota para el próximo frame
     player_2_pos += player_2_vel
     player_3_pos += player_3_vel
+    ball_pos += ball_vel
+
+    # 4. Generar acciones MOCK
+    if i == 100:
+        all_actions[frame_key] = {"action": "Pass", "duration": 45}
+    
+    if i == 200:
+        all_actions[frame_key] = {"action": "Shot", "duration": 60}
+
 
 # --- Guardar los archivos JSON ---
 print(f"Guardando {DETECTIONS_FILE}...")
@@ -58,5 +69,8 @@ print(f"Guardando {CALIBRATION_FILE}...")
 with open(CALIBRATION_FILE, 'w') as f:
     json.dump(all_calibrations, f, indent=2)
 
-print("\n¡Archivos mock generados!")
-print("Ahora puedes correr main.py apuntando a estos nuevos JSONs.")
+print(f"Guardando {ACTIONS_FILE}...") 
+with open(ACTIONS_FILE, 'w') as f:
+    json.dump(all_actions, f, indent=2)
+
+print("\n¡Archivos mock generados (con posiciones corregidas)!")
