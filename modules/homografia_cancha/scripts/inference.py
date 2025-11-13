@@ -240,8 +240,8 @@ if __name__ == "__main__":
     kp_threshold = args.kp_threshold
     line_threshold = args.line_threshold
 
-    cfg = yaml.safe_load(open("config/hrnetv2_w48.yaml", 'r'))
-    cfg_l = yaml.safe_load(open("config/hrnetv2_w48_l.yaml", 'r'))
+    cfg = yaml.safe_load(open("../config/config.yaml", 'r'))
+    cfg_l = yaml.safe_load(open("../config/config_l.yaml", 'r'))
 
     loaded_state = torch.load(args.weights_kp, map_location=device)
     model = get_cls_net(cfg)

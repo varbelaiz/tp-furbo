@@ -16,7 +16,7 @@ from collections import deque
 import supervision as sv
 
 # --- NUEVAS IMPORTACIONES MODULARES ---
-from utils.pitch_annotator import (
+from pitch_annotator import (
     SoccerPitchConfiguration, 
     draw_pitch,
     draw_points_on_pitch,
