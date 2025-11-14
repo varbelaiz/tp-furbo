@@ -26,7 +26,7 @@ except Exception as e:
 # Descomprimirlos
 print("--- Iniciando descompresión manual ---")
 zip_source_path = os.path.join("temp", task_name) 
-unzip_path = "dataset"
+unzip_path = "../dataset"
 
 os.makedirs(unzip_path, exist_ok=True) 
 

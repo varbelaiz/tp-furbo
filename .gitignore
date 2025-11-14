@@ -14,9 +14,12 @@
 /results/
 
 # Datos pre-procesados 
-dataset/train_masks/
-dataset/val_masks/
+modules/homografia_cancha/dataset/train_masks/
+modules/homografia_cancha/dataset/val_masks/
 #########################################
+
+modules/homografia_cancha/wandb
+modules/homografia_cancha/checkpoints
 
 
 __pycache__/
