@@ -19,8 +19,10 @@ python extract_frames_snb.py --video_dir video_dir
 
 RECALC_FPS_ONLY = False
 FRAME_RETRY_THRESHOLD = 1000
-TARGET_HEIGHT = 448
-TARGET_WIDTH = 796
+# TARGET_HEIGHT = 448
+# TARGET_WIDTH = 796
+TARGET_HEIGHT = 224
+TARGET_WIDTH  = 398  # 224 × (16/9) ≃ 398
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -143,27 +145,53 @@ def main(args):
     global RECALC_FPS_ONLY
     RECALC_FPS_ONLY = recalc_fps
 
+    # worker_args = []
+    # for league in os.listdir(video_dir):
+    #     if '.zip' in league:
+    #         continue
+    #     league_dir = os.path.join(video_dir, league)
+    #     for season in os.listdir(league_dir):
+    #         season_dir = os.path.join(league_dir, season)
+    #         for game in os.listdir(season_dir):
+    #             game_dir = os.path.join(season_dir, game)
+    #             for video_file in os.listdir(game_dir):
+    #                 # if (video_file.endswith('720p.mp4') | video_file.endswith('720p.mkv')):
+    #                 # if video_file.endswith('224p.mp4') or video_file.endswith('224p.mkv'):
+    #                 if video_file.endswith('.mp4') or video_file.endswith('.mkv'):
+    #                     video_name = os.path.splitext(video_file)[0].replace(
+    #                         '_720p', '')
+    #                     worker_args.append((
+    #                         os.path.join(league, season, game, video_file),
+    #                         os.path.join(game_dir, video_file),
+    #                         os.path.join(
+    #                             out_dir, league, season, game
+    #                         ) if out_dir else None,
+    #                         sample_fps
+    #                     ))
+    
     worker_args = []
-    for league in os.listdir(video_dir):
-        if '.zip' in league:
+    for split in os.listdir(video_dir):           # test, train, valid
+        split_dir = os.path.join(video_dir, split)
+        if not os.path.isdir(split_dir):
             continue
-        league_dir = os.path.join(video_dir, league)
-        for season in os.listdir(league_dir):
-            season_dir = os.path.join(league_dir, season)
-            for game in os.listdir(season_dir):
-                game_dir = os.path.join(season_dir, game)
-                for video_file in os.listdir(game_dir):
-                    if (video_file.endswith('720p.mp4') | video_file.endswith('720p.mkv')):
-                        video_name = os.path.splitext(video_file)[0].replace(
-                            '_720p', '')
-                        worker_args.append((
-                            os.path.join(league, season, game, video_file),
-                            os.path.join(game_dir, video_file),
-                            os.path.join(
-                                out_dir, league, season, game
-                            ) if out_dir else None,
-                            sample_fps
-                        ))
+        for league in os.listdir(split_dir):
+            if '.zip' in league:
+                continue
+            league_dir = os.path.join(split_dir, league)
+            for season in os.listdir(league_dir):
+                season_dir = os.path.join(league_dir, season)
+                for game in os.listdir(season_dir):
+                    game_dir = os.path.join(season_dir, game)
+                    for video_file in os.listdir(game_dir):
+                        if video_file.endswith('.mp4') or video_file.endswith('.mkv'):
+                            video_name = os.path.splitext(video_file)[0].replace('_720p', '')
+                            worker_args.append((
+                                os.path.join(league, season, game, video_file),
+                                os.path.join(game_dir, video_file),
+                                os.path.join(out_dir, split, league, season, game) if out_dir else None,
+                                sample_fps
+                            ))
+
 
     with Pool(num_workers) as p:
         for _ in tqdm(p.imap_unordered(worker, worker_args),
