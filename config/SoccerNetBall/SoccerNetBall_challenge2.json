@@ -1,8 +1,8 @@
 {
-    "frame_dir": "/path/to/frames",
-    "save_dir": "/path/to/save",
-    "store_dir": "/path/to/store",
-    "store_mode": "load",
+    "frame_dir": "C:/Users/anapt/Repositorios/tp-furbo/path/to/frames/ball_action224",
+    "save_dir": "C:/Users/anapt/Repositorios/tp-furbo/experiments/snb_save",
+    "store_dir": "C:/Users/anapt/Repositorios/tp-furbo/experiments/snb_store",
+    "store_mode": "store",
     "batch_size": 2,
     "clip_len": 100,
     "crop_dim": -1,
@@ -25,8 +25,8 @@
     "criterion": "map",
     "num_workers": 4,
     "pretrain": {
-        "frame_dir": "/path/to/frames",
-        "store_dir": "/path/to/store2",
+        "frame_dir": "C:/Users/anapt/Repositorios/tp-furbo/path/to/frames/ball_action224",
+        "store_dir": "C:/Users/anapt/Repositorios/tp-furbo/experiments/snb_store2",
         "dataset": "soccernet",
         "num_classes": 17
     }
