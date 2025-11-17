@@ -9,14 +9,45 @@ import torchvision.transforms.functional as f
 
 from tqdm import tqdm
 from PIL import Image
-from matplotlib.patches import Polygon
 
 from model.cls_hrnet import get_cls_net
 from model.cls_hrnet_l import get_cls_net as get_cls_net_l
 
 from utils.utils_calib import FramebyFrameCalib, pan_tilt_roll_to_orientation
-from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool, get_keypoints_from_heatmap_batch_maxpool_l, \
-    complete_keypoints, coords_to_dict
+from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool, get_keypoints_from_heatmap_batch_maxpool_l, complete_keypoints, coords_to_dict
+
+import os
+
+DEBUG_SAVE_LIMIT = 50
+debug_frame_counter = 0
+DEBUG_DIR = "debug_heatmaps"
+if not os.path.exists(DEBUG_DIR):
+    os.makedirs(DEBUG_DIR)
+
+
+def save_heatmap_visualization(tensor_hm, prefix, frame_idx):
+    """
+    Toma el tensor de heatmaps (1, C, H, W), lo aplasta a (H, W)
+    y lo guarda como imagen coloreada.
+    """
+    # 1. Tomamos el máximo valor a través de los canales (dim 1).
+    # Esto combina todos los keypoints en una sola "capa".
+    # tensor_hm[0] quita la dimensión del batch.
+    hm_max = torch.max(tensor_hm[0], dim=0)[0] 
+    
+    # 2. Pasar a CPU y Numpy
+    hm_np = hm_max.cpu().numpy()
+    
+    # 3. Normalizar a 0-255 para guardar como imagen
+    # Si la red no detecta nada, el max y min serán bajos, así que normalizamos "min-max"
+    hm_norm = cv2.normalize(hm_np, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    
+    # 4. Aplicar mapa de color (Azul = frío/nada, Rojo = caliente/detectado)
+    hm_color = cv2.applyColorMap(hm_norm, cv2.COLORMAP_JET)
+    
+    # 5. Guardar
+    filename = f"{DEBUG_DIR}/{prefix}_{frame_idx:04d}.png"
+    cv2.imwrite(filename, hm_color)
 
 
 lines_coords = [[[0., 54.16, 0.], [16.5, 54.16, 0.]],
@@ -71,27 +102,32 @@ def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refi
     frame = frame.to(device)
     b, c, h, w = frame.size()
 
+    global debug_frame_counter
+
     with torch.no_grad():
         heatmaps = model(frame)
         heatmaps_l = model_l(frame)
 
-    # Obtenemos dimensiones reales del heatmap (para escalar luego)
-    hm_h, hm_w = heatmaps.shape[2], heatmaps.shape[3]
+        # if debug_frame_counter < DEBUG_SAVE_LIMIT:
+        #     # Guardamos heatmap de puntos (KP)
+        #     save_heatmap_visualization(heatmaps, "KP", debug_frame_counter)
+        #     # Guardamos heatmap de líneas (Lines)
+        #     save_heatmap_visualization(heatmaps_l, "LINE", debug_frame_counter)
+            
+        #     print(f"[DEBUG] Guardado heatmap frame {debug_frame_counter}")
+        #     debug_frame_counter += 1
 
     # 1. Obtener coordenadas crudas
     kp_coords_raw = get_keypoints_from_heatmap_batch_maxpool(heatmaps[:,:-1,:,:])
     line_coords_raw = get_keypoints_from_heatmap_batch_maxpool_l(heatmaps_l[:,:-1,:,:])
     
     # 2. Convertir a diccionarios PERO sin filtrar (threshold=0.0)
-    # Esto nos da TODOS los puntos posibles para poder aplicar lógica custom.
     kp_dict_all = coords_to_dict(kp_coords_raw, threshold=0.0)[0]
     lines_dict_all = coords_to_dict(line_coords_raw, threshold=0.0)[0]
-
-    # --- FILTRADO INTELIGENTE & HACK DEL CÍRCULO ---
     
     kp_dict_filtered = {}
     lines_dict_filtered = {}
-    kp_dict_debug = {} # Para devolver y dibujar todos (incluso los débiles)
+    kp_dict_debug = {}
 
     # Filtrar Puntos (Red 1)
     if kp_dict_all:
@@ -103,7 +139,7 @@ def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refi
             if score > kp_threshold:
                 kp_dict_filtered[cls_id] = coords
 
-    # Filtrar Líneas (Red 2) - AQUÍ APLICAMOS EL HACK
+    # Filtrar Líneas (Red 2)
     if lines_dict_all:
         for cls_id, coords in lines_dict_all.items():
             score = coords.get('score', 0.0)
@@ -117,13 +153,11 @@ def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refi
             
             if score > threshold_to_use:
                 lines_dict_filtered[cls_id] = coords
-                # if is_center_circle:
-                #     print(f"[DEBUG] Círculo Central detectado con score: {score:.3f}")
+                if is_center_circle:
+                    print(f"[DEBUG] Círculo Central detectado con score: {score:.3f}")
 
-    # -----------------------------------------------
 
     # 3. Completar y Normalizar para PnLCalib
-    # Usamos los diccionarios ya filtrados
     kp_dict_final, lines_dict_final = complete_keypoints(
         kp_dict_filtered, lines_dict_filtered, w=w, h=h, normalize=True
     )
@@ -131,8 +165,7 @@ def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refi
     cam.update(kp_dict_final, lines_dict_final)
     final_params_dict = cam.heuristic_voting(refine_lines=pnl_refine, th=25.0)
 
-    # Devolvemos: Calibración, Puntos para Debug (todos), Dimensiones
-    return final_params_dict, kp_dict_debug, (hm_w, hm_h)
+    return final_params_dict, kp_dict_debug
 
 
 def project(frame, P):
@@ -193,7 +226,6 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
     
     cam = FramebyFrameCalib(iwidth=frame_width, iheight=frame_height, denormalize=True)
 
-    # --- ESCALA FIJA (SIMPLIFICADA) ---
     # La red siempre trabaja internamente a 960x540. 
     # Los puntos que devuelve ya están en esa escala.
     NET_INPUT_W = 960
@@ -201,7 +233,6 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
     
     scale_x = frame_width / NET_INPUT_W
     scale_y = frame_height / NET_INPUT_H
-    # ----------------------------------
 
     last_P = None 
     missed_frames = 0
@@ -216,24 +247,19 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
             ret, frame = cap.read()
             if not ret: break
 
-            # Ignoramos las dimensiones que devuelve inference (hm_w, hm_h), ya no las necesitamos
-            final_params_dict, raw_kps, _ = inference(
+            final_params_dict, raw_kps = inference(
                 cam, frame, model_kp, model_line, kp_threshold, line_threshold, pnl_refine
             )
             
-            # --- DIBUJAR PUNTOS (CON ESCALA CORREGIDA) ---
             if raw_kps:
                 for pid, coords in raw_kps.items():
-                    # Filtro visual para no llenar la pantalla de basura
                     score = coords.get('score', 1.0)
-                    if score > 0.05: 
+                    if score > 0.1: 
                         try:
-                            # Usamos la escala fija calculada arriba
                             x = int(coords['x'] * scale_x)
                             y = int(coords['y'] * scale_y)
                             cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
                         except: pass
-            # ---------------------------------------------
 
             # Lógica de Memoria
             current_P = None
