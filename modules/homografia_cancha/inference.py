@@ -1,16 +1,15 @@
 import cv2
 import yaml
 import torch
-import torch.nn as nn
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import torchvision.transforms as T
+import torchvision.transforms.functional as f
+
 from tqdm import tqdm
 from PIL import Image
 from matplotlib.patches import Polygon
-
-import kornia.augmentation as K
-import kornia.geometry.transform as K_T
 
 from model.cls_hrnet import get_cls_net
 from model.cls_hrnet_l import get_cls_net as get_cls_net_l
@@ -63,37 +62,77 @@ def projection_from_cam_params(final_params_dict):
     return P
 
 
-def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine, data_transforms_gpu, device):
-    
-    # 1. Convertir BGR (OpenCV) a RGB
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    
-    # 2. Convertir a Tensor (H,W,C) -> (B,C,H,W), mover a GPU y escalar a [0.0, 1.0]
-    frame_tensor = torch.from_numpy(frame_rgb.copy()).float().to(device)
-    frame_tensor = frame_tensor.permute(2, 0, 1).unsqueeze(0) / 255.0
-
-    # 3. Aplicar transformaciones Kornia (Resize + Normalize) en GPU
-    frame_tensor = data_transforms_gpu(frame_tensor)
-    
-    # 4. Definir las dimensiones del modelo (el heatmap se escala a esto)
-    model_h, model_w = 540, 960
+def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine):
+    # --- Pre-procesamiento ---
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = Image.fromarray(frame)
+    frame = f.to_tensor(frame).float().unsqueeze(0)
+    frame = frame if frame.size()[-1] == 960 else transform2(frame)
+    frame = frame.to(device)
+    b, c, h, w = frame.size()
 
     with torch.no_grad():
-        heatmaps = model(frame_tensor)
-        heatmaps_l = model_l(frame_tensor)
+        heatmaps = model(frame)
+        heatmaps_l = model_l(frame)
 
-    kp_coords = get_keypoints_from_heatmap_batch_maxpool(heatmaps[:,:-1,:,:])
-    line_coords = get_keypoints_from_heatmap_batch_maxpool_l(heatmaps_l[:,:-1,:,:])
+    # Obtenemos dimensiones reales del heatmap (para escalar luego)
+    hm_h, hm_w = heatmaps.shape[2], heatmaps.shape[3]
+
+    # 1. Obtener coordenadas crudas
+    kp_coords_raw = get_keypoints_from_heatmap_batch_maxpool(heatmaps[:,:-1,:,:])
+    line_coords_raw = get_keypoints_from_heatmap_batch_maxpool_l(heatmaps_l[:,:-1,:,:])
     
-    kp_dict = coords_to_dict(kp_coords, threshold=kp_threshold)
-    lines_dict = coords_to_dict(line_coords, threshold=line_threshold)
+    # 2. Convertir a diccionarios PERO sin filtrar (threshold=0.0)
+    # Esto nos da TODOS los puntos posibles para poder aplicar lógica custom.
+    kp_dict_all = coords_to_dict(kp_coords_raw, threshold=0.0)[0]
+    lines_dict_all = coords_to_dict(line_coords_raw, threshold=0.0)[0]
 
-    kp_dict, lines_dict = complete_keypoints(kp_dict[0], lines_dict[0], w=model_w, h=model_h, normalize=True)
+    # --- FILTRADO INTELIGENTE & HACK DEL CÍRCULO ---
+    
+    kp_dict_filtered = {}
+    lines_dict_filtered = {}
+    kp_dict_debug = {} # Para devolver y dibujar todos (incluso los débiles)
 
-    cam.update(kp_dict, lines_dict)
-    final_params_dict = cam.heuristic_voting(refine_lines=pnl_refine)
+    # Filtrar Puntos (Red 1)
+    if kp_dict_all:
+        for cls_id, coords in kp_dict_all.items():
+            score = coords.get('score', 0.0)
+            kp_dict_debug[cls_id] = coords # Guardamos todo para debug visual
+            
+            # Aplicamos el threshold normal
+            if score > kp_threshold:
+                kp_dict_filtered[cls_id] = coords
 
-    return final_params_dict
+    # Filtrar Líneas (Red 2) - AQUÍ APLICAMOS EL HACK
+    if lines_dict_all:
+        for cls_id, coords in lines_dict_all.items():
+            score = coords.get('score', 0.0)
+            
+            # ID 6 suele ser el Círculo Central en SoccerNet
+            is_center_circle = (cls_id == 6) 
+            
+            # Umbral dinámico: 
+            # Si es el círculo, aceptamos casi cualquier cosa (0.05). Si no, somos estrictos.
+            threshold_to_use = 0.05 if is_center_circle else line_threshold
+            
+            if score > threshold_to_use:
+                lines_dict_filtered[cls_id] = coords
+                # if is_center_circle:
+                #     print(f"[DEBUG] Círculo Central detectado con score: {score:.3f}")
+
+    # -----------------------------------------------
+
+    # 3. Completar y Normalizar para PnLCalib
+    # Usamos los diccionarios ya filtrados
+    kp_dict_final, lines_dict_final = complete_keypoints(
+        kp_dict_filtered, lines_dict_filtered, w=w, h=h, normalize=True
+    )
+
+    cam.update(kp_dict_final, lines_dict_final)
+    final_params_dict = cam.heuristic_voting(refine_lines=pnl_refine, th=25.0)
+
+    # Devolvemos: Calibración, Puntos para Debug (todos), Dimensiones
+    return final_params_dict, kp_dict_debug, (hm_w, hm_h)
 
 
 def project(frame, P):
@@ -144,18 +183,30 @@ def project(frame, P):
 
 
 def process_input(input_path, input_type, model_kp, model_line, kp_threshold, line_threshold, pnl_refine,
-                  save_path, display, data_transforms_gpu, device):
+                  save_path, display):
 
     cap = cv2.VideoCapture(input_path)
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-
+    
     cam = FramebyFrameCalib(iwidth=frame_width, iheight=frame_height, denormalize=True)
 
+    # --- ESCALA FIJA (SIMPLIFICADA) ---
+    # La red siempre trabaja internamente a 960x540. 
+    # Los puntos que devuelve ya están en esa escala.
+    NET_INPUT_W = 960
+    NET_INPUT_H = 540
+    
+    scale_x = frame_width / NET_INPUT_W
+    scale_y = frame_height / NET_INPUT_H
+    # ----------------------------------
+
+    last_P = None 
+    missed_frames = 0
+
     if input_type == 'video':
-        cap = cv2.VideoCapture(input_path)
         if save_path != "":
             out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
@@ -163,54 +214,53 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
 
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret:
-                break
+            if not ret: break
 
-            final_params_dict = inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine, 
-                                          data_transforms_gpu, device)
+            # Ignoramos las dimensiones que devuelve inference (hm_w, hm_h), ya no las necesitamos
+            final_params_dict, raw_kps, _ = inference(
+                cam, frame, model_kp, model_line, kp_threshold, line_threshold, pnl_refine
+            )
             
+            # --- DIBUJAR PUNTOS (CON ESCALA CORREGIDA) ---
+            if raw_kps:
+                for pid, coords in raw_kps.items():
+                    # Filtro visual para no llenar la pantalla de basura
+                    score = coords.get('score', 1.0)
+                    if score > 0.05: 
+                        try:
+                            # Usamos la escala fija calculada arriba
+                            x = int(coords['x'] * scale_x)
+                            y = int(coords['y'] * scale_y)
+                            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
+                        except: pass
+            # ---------------------------------------------
+
+            # Lógica de Memoria
+            current_P = None
             if final_params_dict is not None:
-                P = projection_from_cam_params(final_params_dict)
-                projected_frame = project(frame, P)
+                current_P = projection_from_cam_params(final_params_dict)
+                last_P = current_P
+                missed_frames = 0
+            elif last_P is not None and missed_frames < 5:
+                current_P = last_P
+                missed_frames += 1
+
+            if current_P is not None:
+                projected_frame = project(frame, current_P)
             else:
                 projected_frame = frame
+                cv2.putText(projected_frame, "CALIB FAIL", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
                 
-            if save_path != "":
-                out.write(projected_frame)
-    
+            if save_path != "": out.write(projected_frame)
             if display:
-                cv2.imshow('Projected Frame', projected_frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                cv2.imshow('Projected', projected_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'): break
             
             pbar.update(1)
 
         cap.release()
-        if save_path != "":
-            out.release()
+        if save_path != "": out.release()
         cv2.destroyAllWindows()
-
-    elif input_type == 'image':
-        frame = cv2.imread(input_path)
-        if frame is None:
-            print(f"Error: Unable to read the image {input_path}")
-            return
-
-        final_params_dict = inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine, 
-                                      data_transforms_gpu, device)
-        
-        if final_params_dict is not None:
-            P = projection_from_cam_params(final_params_dict)
-            projected_frame = project(frame, P)
-        else:
-            projected_frame = frame
-
-        if save_path != "":
-            cv2.imwrite(save_path, projected_frame)
-        else:
-            plt.imshow(cv2.cvtColor(projected_frame, cv2.COLOR_BGR2RGB))
-            plt.axis('off')
-            plt.show()
 
 if __name__ == "__main__":
 
@@ -235,13 +285,13 @@ if __name__ == "__main__":
     model_line = args.weights_line
     pnl_refine = args.pnl_refine
     save_path = args.save_path
-    device = torch.device(args.device) 
+    device = args.device
     display = args.display and input_type == 'video'
     kp_threshold = args.kp_threshold
     line_threshold = args.line_threshold
 
-    cfg = yaml.safe_load(open("../config/config.yaml", 'r'))
-    cfg_l = yaml.safe_load(open("../config/config_l.yaml", 'r'))
+    cfg = yaml.safe_load(open("config/hrnetv2_w48.yaml", 'r'))
+    cfg_l = yaml.safe_load(open("config/hrnetv2_w48_l.yaml", 'r'))
 
     loaded_state = torch.load(args.weights_kp, map_location=device)
     model = get_cls_net(cfg)
@@ -255,11 +305,7 @@ if __name__ == "__main__":
     model_l.to(device)
     model_l.eval()
 
-    data_transforms_gpu = nn.Sequential(
-        K_T.Resize((540, 960), antialias=True),
-        K.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]).to(device),
-                    std=torch.tensor([0.229, 0.224, 0.225]).to(device))
-    ).to(device)
+    transform2 = T.Resize((540, 960))
 
-    process_input(input_path, input_type, model_kp, model_line, kp_threshold, line_threshold, pnl_refine,
-                  save_path, display, data_transforms_gpu, device) 
+    process_input(input_path, input_type, model, model_l, kp_threshold, line_threshold, pnl_refine,
+                  save_path, display)

@@ -10,7 +10,8 @@ from tqdm import tqdm
 print("Inicializando descargador...")
 downloader = SoccerNetDownloader(LocalDirectory="temp") 
 
-splits_a_bajar = ["train", "valid"]
+# splits_a_bajar = ["train", "valid"]
+splits_a_bajar = ["test"]
 task_name = "calibration-2023"
 
 try:

@@ -374,14 +374,19 @@ class FramebyFrameCalib:
 
         obj_pts, img_pts = self.get_correspondences(mode)
         if len(obj_pts) < 6:
-            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                self.obj_pts,
-                self.img_pts,
-                (self.image_width, self.image_height),
-                None,
-                None,
-                flags=flags,
-            )
+            try:
+                ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+                    self.obj_pts,
+                    self.img_pts,
+                    (self.image_width, self.image_height),
+                    None,
+                    None,
+                    flags=flags,
+                )
+            except cv2.error as e:
+                print(f"    -> ADVERTENCIA: cv2.calibrateCamera (modo < 6 pts) falló. Error: {e}")
+                print(f"    -> Probablemente por puntos colineales. Omitiendo frame.")
+                return None, None # Devolvemos None para indicar el fallo
 
         else:
             mtx = cv2.initCameraMatrix2D(
@@ -392,17 +397,24 @@ class FramebyFrameCalib:
             )
             if not np.isnan(np.min(mtx)):
                 flags2 = flags | cv2.CALIB_USE_INTRINSIC_GUESS
-
-                ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                    [obj_pts],
-                    [img_pts],
-                    (self.image_width, self.image_height),
-                    mtx,
-                    None,
-                    flags=flags2,
-                )
+                
+                try:
+                    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+                        [obj_pts],
+                        [img_pts],
+                        (self.image_width, self.image_height),
+                        mtx,
+                        None,
+                        flags=flags2,
+                    )
+                except cv2.error as e:
+                    print(f"    -> ADVERTENCIA: cv2.calibrateCamera (modo > 6 pts) falló. Error: {e}")
+                    print(f"    -> Probablemente por puntos colineales. Omitiendo frame.")
+                    return None, None # Devolvemos None para indicar el fallo
             else:
+                print("    -> ADVERTENCIA: initCameraMatrix2D devolvió NaN. Omitiendo frame.")
                 ret = False
+                return None, None # Nos aseguramos de devolver None aquí también
 
         if ret:
             self.calibration = mtx
@@ -683,6 +695,11 @@ class FramebyFrameCalib:
             for use_ransac in [0, 5, 10, 15, 25, 50]:
                 cam_params, ret = self.get_cam_params(mode=mode, use_ransac=use_ransac,
                                                       refine=refine, refine_w_lines=refine_lines)
+
+                if cam_params is None or ret is None:
+                    # Si get_cam_params falló, abortamos y devolvemos None
+                    return None
+
                 if ret:
                     result_dict = {'mode': mode, 'use_ransac': use_ransac, 'rep_err': ret,
                                    'cam_params': cam_params, 'calib_plane': self.ord_pts[0]}
