@@ -9,45 +9,14 @@ import torchvision.transforms.functional as f
 
 from tqdm import tqdm
 from PIL import Image
+from matplotlib.patches import Polygon
 
 from model.cls_hrnet import get_cls_net
 from model.cls_hrnet_l import get_cls_net as get_cls_net_l
 
 from utils.utils_calib import FramebyFrameCalib, pan_tilt_roll_to_orientation
-from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool, get_keypoints_from_heatmap_batch_maxpool_l, complete_keypoints, coords_to_dict
-
-import os
-
-DEBUG_SAVE_LIMIT = 50
-debug_frame_counter = 0
-DEBUG_DIR = "debug_heatmaps"
-if not os.path.exists(DEBUG_DIR):
-    os.makedirs(DEBUG_DIR)
-
-
-def save_heatmap_visualization(tensor_hm, prefix, frame_idx):
-    """
-    Toma el tensor de heatmaps (1, C, H, W), lo aplasta a (H, W)
-    y lo guarda como imagen coloreada.
-    """
-    # 1. Tomamos el máximo valor a través de los canales (dim 1).
-    # Esto combina todos los keypoints en una sola "capa".
-    # tensor_hm[0] quita la dimensión del batch.
-    hm_max = torch.max(tensor_hm[0], dim=0)[0] 
-    
-    # 2. Pasar a CPU y Numpy
-    hm_np = hm_max.cpu().numpy()
-    
-    # 3. Normalizar a 0-255 para guardar como imagen
-    # Si la red no detecta nada, el max y min serán bajos, así que normalizamos "min-max"
-    hm_norm = cv2.normalize(hm_np, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    
-    # 4. Aplicar mapa de color (Azul = frío/nada, Rojo = caliente/detectado)
-    hm_color = cv2.applyColorMap(hm_norm, cv2.COLORMAP_JET)
-    
-    # 5. Guardar
-    filename = f"{DEBUG_DIR}/{prefix}_{frame_idx:04d}.png"
-    cv2.imwrite(filename, hm_color)
+from utils.utils_heatmap import get_keypoints_from_heatmap_batch_maxpool, get_keypoints_from_heatmap_batch_maxpool_l, \
+    complete_keypoints, coords_to_dict
 
 
 lines_coords = [[[0., 54.16, 0.], [16.5, 54.16, 0.]],
@@ -75,6 +44,122 @@ lines_coords = [[[0., 54.16, 0.], [16.5, 54.16, 0.]],
                 [[99.5, 24.84, 0.], [105., 24.84, 0.]]]
 
 
+def project_2d(frame, H):
+    
+    W_WORLD, H_WORLD = 105, 68
+    W_HALF, H_HALF = W_WORLD / 2, H_WORLD / 2
+    img_h, img_w = frame.shape[:2]
+
+    # --- 1. Proyección de Líneas ---
+    for i, line in enumerate(lines_coords):
+        w1, w2 = line[0], line[1]
+        
+        # 1. Coordenadas del mundo Centradas y Homogéneas
+        i1_homo = H @ np.array([w1[0] - W_HALF, w1[1] - H_HALF, 1])
+        i2_homo = H @ np.array([w2[0] - W_HALF, w2[1] - H_HALF, 1])
+
+        # 🛑 DEBUG: Print the raw homogeneous coordinates
+        # if i == 0:
+            # print(f"\n--- HOMOGENEOUS DEBUG ---")
+            # print(f"  i1_homo (Raw Px, Raw Py, Px Factor): {i1_homo}")
+            # print(f"  i2_homo (Raw Px, Raw Py, Px Factor): {i2_homo}")
+        
+        # 2. Normalización Homogénea (Dividir por el tercer componente)
+        try:
+            # i1_homo[-1] is the perspective divisor (s).
+            # If s is zero or near-zero, division fails.
+            s1 = i1_homo[-1]
+            s2 = i2_homo[-1]
+
+            if abs(s1) < 1e-6 or abs(s2) < 1e-6:
+                #  print(f"  [CRITICAL ERROR] Divisor is near zero. s1: {s1}, s2: {s2}")
+                 continue
+
+            # i1 es la coordenada de píxel [x', y']
+            i1 = (i1_homo / i1_homo[-1])[:2]
+            i2 = (i2_homo / i2_homo[-1])[:2]
+        except FloatingPointError:
+            continue
+            
+        # 3. Clipping Robusto y Conversión a Enteros
+        
+        # Usamos np.clip para forzar que los puntos (que están fuera) se dibujen
+        # justo en el borde de la imagen, evitando que cv2.line falle.
+        x1 = np.clip(i1[0], -200, img_w + 200)
+        y1 = np.clip(i1[1], -200, img_h + 200)
+        x2 = np.clip(i2[0], -200, img_w + 200)
+        y2 = np.clip(i2[1], -200, img_h + 200)
+
+        # 🛑 DEBUG: Print the final pixel coordinates
+        # if i == 0:
+            # print(f"  Final Px Coords (Clipped): ({int(x1)}, {int(y1)}) -> ({int(x2)}, {int(y2)})")
+        
+        # Dibujar la línea (OpenCV maneja el clipping final si los puntos están en el margen)
+        frame = cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 3) # Amarillo para que resalte
+
+    # --- 2. Proyección de Círculos (Ajuste del arco) ---
+    r = 9.15
+    pts1, pts2, pts3 = [], [], []
+
+    # Círculos y Elipses
+    
+    # Círculo de penalización Izquierdo
+    center_pos_l = np.array([11. - W_HALF, H_HALF - H_HALF])
+    for ang in np.linspace(37, 143, 50):
+        ang = np.deg2rad(ang)
+        wx = center_pos_l[0] + r * np.sin(ang)
+        wy = center_pos_l[1] + r * np.cos(ang)
+        ipos_homo = H @ np.array([wx, wy, 1])
+        
+        if ipos_homo[-1] != 0:
+            ipos = (ipos_homo / ipos_homo[-1])[:2]
+            # Clip y Añadir a la lista
+            x = np.clip(ipos[0], -200, img_w + 200)
+            y = np.clip(ipos[1], -200, img_h + 200)
+            pts1.append([int(x), int(y)])
+
+    # Círculo de penalización Derecho
+    center_pos_r = np.array([94. - W_HALF, H_HALF - H_HALF])
+    for ang in np.linspace(217, 323, 200):
+        ang = np.deg2rad(ang)
+        wx = center_pos_r[0] + r * np.sin(ang)
+        wy = center_pos_r[1] + r * np.cos(ang)
+        ipos_homo = H @ np.array([wx, wy, 1])
+        
+        if ipos_homo[-1] != 0:
+            ipos = (ipos_homo / ipos_homo[-1])[:2]
+            x = np.clip(ipos[0], -200, img_w + 200)
+            y = np.clip(ipos[1], -200, img_h + 200)
+            pts2.append([int(x), int(y)])
+
+    # Círculo Central
+    center_pos_c = np.array([0., 0.])
+    for ang in np.linspace(0, 360, 500):
+        ang = np.deg2rad(ang)
+        wx = center_pos_c[0] + r * np.sin(ang)
+        wy = center_pos_c[1] + r * np.cos(ang)
+        ipos_homo = H @ np.array([wx, wy, 1])
+        
+        if ipos_homo[-1] != 0:
+            ipos = (ipos_homo / ipos_homo[-1])[:2]
+            x = np.clip(ipos[0], -200, img_w + 200)
+            y = np.clip(ipos[1], -200, img_h + 200)
+            pts3.append([int(x), int(y)])
+
+    # Dibujar polilíneas (Solo si tienen suficientes puntos)
+    if len(pts1) > 1:
+        XEllipse1 = np.array(pts1, np.int32)
+        frame = cv2.polylines(frame, [XEllipse1], False, (0, 255, 255), 3)
+    if len(pts2) > 1:
+        XEllipse2 = np.array(pts2, np.int32)
+        frame = cv2.polylines(frame, [XEllipse2], False, (0, 255, 255), 3)
+    if len(pts3) > 1:
+        XEllipse3 = np.array(pts3, np.int32)
+        frame = cv2.polylines(frame, [XEllipse3], True, (0, 255, 255), 3) # Círculo central se cierra
+
+    return frame
+
+
 def projection_from_cam_params(final_params_dict):
     cam_params = final_params_dict["cam_params"]
     x_focal_length = cam_params['x_focal_length']
@@ -94,78 +179,35 @@ def projection_from_cam_params(final_params_dict):
 
 
 def inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine):
-    # --- Pre-procesamiento ---
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame = Image.fromarray(frame)
+
     frame = f.to_tensor(frame).float().unsqueeze(0)
+    _, _, h_original, w_original = frame.size()
     frame = frame if frame.size()[-1] == 960 else transform2(frame)
     frame = frame.to(device)
     b, c, h, w = frame.size()
-
-    global debug_frame_counter
 
     with torch.no_grad():
         heatmaps = model(frame)
         heatmaps_l = model_l(frame)
 
-        # if debug_frame_counter < DEBUG_SAVE_LIMIT:
-        #     # Guardamos heatmap de puntos (KP)
-        #     save_heatmap_visualization(heatmaps, "KP", debug_frame_counter)
-        #     # Guardamos heatmap de líneas (Lines)
-        #     save_heatmap_visualization(heatmaps_l, "LINE", debug_frame_counter)
-            
-        #     print(f"[DEBUG] Guardado heatmap frame {debug_frame_counter}")
-        #     debug_frame_counter += 1
+    kp_coords = get_keypoints_from_heatmap_batch_maxpool(heatmaps[:,:-1,:,:])
+    line_coords = get_keypoints_from_heatmap_batch_maxpool_l(heatmaps_l[:,:-1,:,:])
+    kp_dict = coords_to_dict(kp_coords, threshold=kp_threshold)
+    lines_dict = coords_to_dict(line_coords, threshold=line_threshold)
+    kp_dict, lines_dict = complete_keypoints(kp_dict[0], lines_dict[0], w=w, h=h, normalize=True)
 
-    # 1. Obtener coordenadas crudas
-    kp_coords_raw = get_keypoints_from_heatmap_batch_maxpool(heatmaps[:,:-1,:,:])
-    line_coords_raw = get_keypoints_from_heatmap_batch_maxpool_l(heatmaps_l[:,:-1,:,:])
-    
-    # 2. Convertir a diccionarios PERO sin filtrar (threshold=0.0)
-    kp_dict_all = coords_to_dict(kp_coords_raw, threshold=0.0)[0]
-    lines_dict_all = coords_to_dict(line_coords_raw, threshold=0.0)[0]
-    
-    kp_dict_filtered = {}
-    lines_dict_filtered = {}
-    kp_dict_debug = {}
+    cam.update(kp_dict, lines_dict)
 
-    # Filtrar Puntos (Red 1)
-    if kp_dict_all:
-        for cls_id, coords in kp_dict_all.items():
-            score = coords.get('score', 0.0)
-            kp_dict_debug[cls_id] = coords # Guardamos todo para debug visual
-            
-            # Aplicamos el threshold normal
-            if score > kp_threshold:
-                kp_dict_filtered[cls_id] = coords
-
-    # Filtrar Líneas (Red 2)
-    if lines_dict_all:
-        for cls_id, coords in lines_dict_all.items():
-            score = coords.get('score', 0.0)
-            
-            # ID 6 suele ser el Círculo Central en SoccerNet
-            is_center_circle = (cls_id == 6) 
-            
-            # Umbral dinámico: 
-            # Si es el círculo, aceptamos casi cualquier cosa (0.05). Si no, somos estrictos.
-            threshold_to_use = 0.05 if is_center_circle else line_threshold
-            
-            if score > threshold_to_use:
-                lines_dict_filtered[cls_id] = coords
-                if is_center_circle:
-                    print(f"[DEBUG] Círculo Central detectado con score: {score:.3f}")
+    # print("len(kp_dict):", len(kp_dict))
 
 
-    # 3. Completar y Normalizar para PnLCalib
-    kp_dict_final, lines_dict_final = complete_keypoints(
-        kp_dict_filtered, lines_dict_filtered, w=w, h=h, normalize=True
-    )
+    # homography_result = cam.heuristic_voting(refine_lines=pnl_refine,th=1.5)
 
-    cam.update(kp_dict_final, lines_dict_final)
-    final_params_dict = cam.heuristic_voting(refine_lines=pnl_refine, th=25.0)
+    homography_result = cam.heuristic_voting_ground(refine_lines=pnl_refine,th=15.0)
 
-    return final_params_dict, kp_dict_debug
+    return homography_result
 
 
 def project(frame, P):
@@ -223,21 +265,11 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    
+
     cam = FramebyFrameCalib(iwidth=frame_width, iheight=frame_height, denormalize=True)
 
-    # La red siempre trabaja internamente a 960x540. 
-    # Los puntos que devuelve ya están en esa escala.
-    NET_INPUT_W = 960
-    NET_INPUT_H = 540
-    
-    scale_x = frame_width / NET_INPUT_W
-    scale_y = frame_height / NET_INPUT_H
-
-    last_P = None 
-    missed_frames = 0
-
     if input_type == 'video':
+        cap = cv2.VideoCapture(input_path)
         if save_path != "":
             out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
@@ -245,48 +277,69 @@ def process_input(input_path, input_type, model_kp, model_line, kp_threshold, li
 
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret: break
+            if not ret:
+                break
 
-            final_params_dict, raw_kps = inference(
-                cam, frame, model_kp, model_line, kp_threshold, line_threshold, pnl_refine
-            )
-            
-            if raw_kps:
-                for pid, coords in raw_kps.items():
-                    score = coords.get('score', 1.0)
-                    if score > 0.1: 
-                        try:
-                            x = int(coords['x'] * scale_x)
-                            y = int(coords['y'] * scale_y)
-                            cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
-                        except: pass
-
-            # Lógica de Memoria
-            current_P = None
+            final_params_dict = inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine)
             if final_params_dict is not None:
-                current_P = projection_from_cam_params(final_params_dict)
-                last_P = current_P
-                missed_frames = 0
-            elif last_P is not None and missed_frames < 5:
-                current_P = last_P
-                missed_frames += 1
+                    
+                # P = projection_from_cam_params(final_params_dict)
+                # projected_frame = project(frame, P)
 
-            if current_P is not None:
-                projected_frame = project(frame, current_P)
+                H = final_params_dict['homography']
+
+                TX_CORRECTION = 600  # Mover la proyección 600 píxeles a la derecha
+                TY_CORRECTION = 300  # Mover la proyección 300 píxeles hacia abajo
+
+                T = np.array([
+                    [1, 0, TX_CORRECTION],
+                    [0, 1, TY_CORRECTION],
+                    [0, 0, 1]
+                ], dtype=np.float64)
+
+                # 🛑 APLICAR LA CORRECCIÓN:
+                H = T @ H
+
+                # print("Estimated Homography:\n", H)
+
+                projected_frame = project_2d(frame, H)
             else:
                 projected_frame = frame
-                cv2.putText(projected_frame, "CALIB FAIL", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
                 
-            if save_path != "": out.write(projected_frame)
+            if save_path != "":
+                out.write(projected_frame)
+    
             if display:
-                cv2.imshow('Projected', projected_frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'): break
+                cv2.imshow('Projected Frame', projected_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
             
             pbar.update(1)
 
         cap.release()
-        if save_path != "": out.release()
+        if save_path != "":
+            out.release()
         cv2.destroyAllWindows()
+
+    elif input_type == 'image':
+        frame = cv2.imread(input_path)
+        if frame is None:
+            print(f"Error: Unable to read the image {input_path}")
+            return
+
+        final_params_dict = inference(cam, frame, model, model_l, kp_threshold, line_threshold, pnl_refine)
+        if final_params_dict is not None:
+            P = projection_from_cam_params(final_params_dict)
+            projected_frame = project(frame, P)
+        else:
+            projected_frame = frame
+
+        if save_path != "":
+            cv2.imwrite(save_path, projected_frame)
+        else:
+            plt.imshow(cv2.cvtColor(projected_frame, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.show()
 
 if __name__ == "__main__":
 
@@ -333,5 +386,5 @@ if __name__ == "__main__":
 
     transform2 = T.Resize((540, 960))
 
-    process_input(input_path, input_type, model, model_l, kp_threshold, line_threshold, pnl_refine,
+    process_input(input_path, input_type, model_kp, model_line, kp_threshold, line_threshold, pnl_refine,
                   save_path, display)

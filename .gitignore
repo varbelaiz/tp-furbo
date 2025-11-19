@@ -20,6 +20,8 @@ modules/homografia_cancha/dataset/val_masks/
 
 modules/homografia_cancha/wandb
 modules/homografia_cancha/checkpoints
+modules/homografia_cancha/debug_heatmaps
+modules/homografia_cancha/resultados
 
 
 __pycache__/
@@ -43,3 +45,6 @@ modules/homografia_cancha/dataset/
 
 # .vscode/
 # .idea/
+*.mp4
+*.zip
+*.mkv

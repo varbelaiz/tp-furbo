@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""
-============================================================
-PROYECTO TPF: SCRIPT MAESTRO (FASE 5: FUSIÓN CON UTILS MODULAR)
-============================================================
-"""
-
 import cv2
 import json
 import numpy as np
@@ -15,21 +6,15 @@ from tqdm import tqdm
 from collections import deque 
 import supervision as sv
 
-# --- NUEVAS IMPORTACIONES MODULARES ---
-from pitch_annotator import (
-    SoccerPitchConfiguration, 
-    draw_pitch,
-    draw_points_on_pitch,
-    draw_highlight_on_pitch
-)
+from pitch_annotator import SoccerPitchConfiguration, draw_pitch, draw_points_on_pitch, draw_highlight_on_pitch
 
 # --- CONFIGURACIÓN DE DIBUJO ---
 TRAJECTORY_MAX_LEN = 90
 RADAR_ALPHA = 0.8
 RADAR_MARGIN_PX = 20
-RADAR_W_PX = 400 # Ancho fijo para el radar
+RADAR_W_PX = 400 
 
-# --- COLORES DE EQUIPOS Y PELOTA (Estilo Supervision) ---
+# --- COLORES DE EQUIPOS Y PELOTA ---
 COLOR_TEAM_A = sv.Color.from_hex('#FF1493') # Rosa
 COLOR_TEAM_B = sv.Color.from_hex('#00BFFF') # Azul
 COLOR_BALL = sv.Color.from_hex('#FFD700')   # Dorado
@@ -55,47 +40,38 @@ def get_player_foot_points(detections: list) -> tuple[np.ndarray, list, list]:
 
 def process_video(video_path: str, detections_path: str, calibration_path: str, actions_path: str, output_path: str):
     print("Cargando archivos JSON a memoria...")
+
     try:
         with open(detections_path, 'r') as f: all_detections = json.load(f)
-    except FileNotFoundError: print(f"Error: No se encontró {detections_path}"); return
-    try:
         with open(calibration_path, 'r') as f: all_calibrations = json.load(f)
-    except FileNotFoundError: print(f"Error: No se encontró {calibration_path}"); return
-    try:
         with open(actions_path, 'r') as f: all_actions = json.load(f)
-    except FileNotFoundError: print(f"Error: No se encontró {actions_path}"); return
+
+    except FileNotFoundError: 
+        print(f"Error: No se encontró alguno de los archivos JSON")
+        return
+    
     print("Datos cargados.")
 
     cap = cv2.VideoCapture(video_path)
+
     if not cap.isOpened():
-        print(f"Advertencia: No se pudo abrir {video_path}. Creando video DUMMY.")
-        frame_width, frame_height = 1280, 720
-        fps = 30
-        total_frames = 270 
-        def dummy_generator(w, h, num_frames):
-            for _ in range(num_frames): yield True, np.zeros((h, w, 3), dtype=np.uint8)
-            yield False, None
-        cap = dummy_generator(frame_width, frame_height, total_frames)
-    else:
-        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"No se pudo abrir {video_path}")
+        return
+
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     writer = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
     
-    
     print("Configurando el dibujado del campo...")
-    # --- CAMBIO: Inicializar Config, no Annotator ---
     PITCH_CONFIG = SoccerPitchConfiguration(width=105.0, height=68.0)
     
-    # Dibujar un campo temporal para obtener el 'transformer' y el alto
     temp_radar, transformer = draw_pitch(PITCH_CONFIG, pitch_width_pixels=RADAR_W_PX)
     RADAR_H_PX = temp_radar.shape[0]
     print(f"Radar renderizado a {RADAR_W_PX}x{RADAR_H_PX} px")
-    # -------------------------------------------------
-    
     
     ball_trajectory_history = deque(maxlen=TRAJECTORY_MAX_LEN)
     current_action_highlight = None
@@ -124,7 +100,7 @@ def process_video(video_path: str, detections_path: str, calibration_path: str, 
                 player_points_2D, player_ids, player_jerseys = get_player_foot_points(detections)
                 
                 if player_points_2D is not None:
-                    # 1. Transformar puntos 2D -> 3D (Mundo)
+                    # 1. Transformar puntos camara -> mundo
                     player_points_3D = cv2.perspectiveTransform(player_points_2D, H_inv)
                     player_points_world = player_points_3D.reshape(-1, 2)
                     
@@ -160,7 +136,7 @@ def process_video(video_path: str, detections_path: str, calibration_path: str, 
                     if current_action_highlight:
                         radar_frame = draw_highlight_on_pitch(
                             pitch=radar_frame, 
-                            transformer=transformer, # Pasar el transformer
+                            transformer=transformer, 
                             trajectory=current_action_highlight["trajectory"],
                             label=current_action_highlight["label"]
                         )

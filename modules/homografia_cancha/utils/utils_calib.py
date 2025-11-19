@@ -664,20 +664,23 @@ class FramebyFrameCalib:
 
             if H is not None:
                 self.homography = H
-                self.from_homography()
+                # self.from_homography()
                 rep_err = self.reproj_err_ground(obj_pts, img_pts)
-                if self.position is not None:
-                    if refine_lines:
-                        self.lines_consensus_ground()
-                        vector = H.flatten()[:-1]
-                        res = least_squares(self.line_optimizer_ground, vector, verbose=0, ftol=1e-4, x_scale="jac",
-                                            method='lm', args=(img_pts, obj_pts))
+
+                # print("Initial homography reproj err:", rep_err)
+
+                # if self.position is not None:
+                #     if refine_lines:
+                #         self.lines_consensus_ground()
+                #         vector = H.flatten()[:-1]
+                #         res = least_squares(self.line_optimizer_ground, vector, verbose=0, ftol=1e-4, x_scale="jac",
+                #                             method='lm', args=(img_pts, obj_pts))
     
-                        vector_opt = res['x']
-                        if not any(np.isnan(vector_opt)):
-                            H = np.append(vector_opt, 1).reshape(3, 3)
-                            self.homography = H
-                            rep_err = self.reproj_err_ground(obj_pts, img_pts)
+                #         vector_opt = res['x']
+                #         if not any(np.isnan(vector_opt)):
+                #             H = np.append(vector_opt, 1).reshape(3, 3)
+                #             self.homography = H
+                #             rep_err = self.reproj_err_ground(obj_pts, img_pts)
                 if inverse:
                     H_inv = np.linalg.inv(H)
                     return H_inv / H_inv[-1, -1], rep_err
@@ -718,6 +721,7 @@ class FramebyFrameCalib:
     def heuristic_voting_ground(self, refine_lines=False, th=5.):
         final_results = []
         for use_ransac in [0, 5, 10, 15, 25, 50]:
+        # for use_ransac in [0]:
             H, ret = self.get_homography_from_ground_plane(use_ransac=use_ransac, inverse=True, refine_lines=refine_lines)
             if H is not None:
                 result_dict = {'use_ransac': use_ransac, 'rep_err': ret, 'homography': H}
@@ -725,9 +729,9 @@ class FramebyFrameCalib:
 
         if final_results:
             final_results.sort(key=lambda x: (x['rep_err']))
-            for res in final_results:
-                if res['use_ransac'] == 0 and res['rep_err'] <= th:
-                    return res
+            # for res in final_results:
+            #     if res['use_ransac'] == 0 and res['rep_err'] <= th:
+            #         return res
             # Return the first element in the sorted list (if it's not empty)
             return final_results[0]
         else:
