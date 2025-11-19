@@ -6,7 +6,7 @@ from tqdm import tqdm
 from collections import deque 
 import supervision as sv
 
-from pitch_annotator import SoccerPitchConfiguration, draw_pitch, draw_points_on_pitch, draw_highlight_on_pitch
+from src.pitch_annotator import SoccerPitchConfiguration, draw_pitch, draw_points_on_pitch, draw_highlight_on_pitch
 
 # --- CONFIGURACIÓN DE DIBUJO ---
 TRAJECTORY_MAX_LEN = 90

@@ -721,7 +721,6 @@ class FramebyFrameCalib:
     def heuristic_voting_ground(self, refine_lines=False, th=5.):
         final_results = []
         for use_ransac in [0, 5, 10, 15, 25, 50]:
-        # for use_ransac in [0]:
             H, ret = self.get_homography_from_ground_plane(use_ransac=use_ransac, inverse=True, refine_lines=refine_lines)
             if H is not None:
                 result_dict = {'use_ransac': use_ransac, 'rep_err': ret, 'homography': H}
@@ -729,10 +728,6 @@ class FramebyFrameCalib:
 
         if final_results:
             final_results.sort(key=lambda x: (x['rep_err']))
-            # for res in final_results:
-            #     if res['use_ransac'] == 0 and res['rep_err'] <= th:
-            #         return res
-            # Return the first element in the sorted list (if it's not empty)
             return final_results[0]
         else:
             return None
