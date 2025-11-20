@@ -1,0 +1,12 @@
+
+path: soccernet_dataset  # Relativo a donde ejecutes el comando yolo, o usa ruta absoluta /Users/tu_usuario/...
+train: train/images
+val: valid/images
+test: test/images
+
+# Keypoints
+kpt_shape: [32, 3]
+flip_idx: [26, 27, 28, 29, 30, 31, 24, 25, 8, 19, 10, 11, 22, 13, 14, 15, 16, 17, 18, 9, 20, 21, 12, 23, 6, 7, 0, 1, 2, 3, 4, 5]
+
+names:
+  0: soccer-pitch
