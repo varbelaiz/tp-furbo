@@ -1,0 +1,8 @@
+ultralytics
+opencv-python-headless
+numpy
+tqdm
+wandb
+pyyaml
+matplotlib
+SoccerNet
