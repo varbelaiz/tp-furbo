@@ -8,7 +8,7 @@ def main():
     DATA_YAML = 'soccernet.yaml'
     EPOCHS = 100
     IMGSZ = 640
-    BATCH_SIZE = 16 
+    BATCH_SIZE = 8
     PROJECT_NAME = 'entrenamiento_cancha'
     RUN_NAME = 'run_cloud_v1' 
 
@@ -41,7 +41,7 @@ def main():
         project=PROJECT_NAME,
         name=RUN_NAME,
         exist_ok=True,
-        workers=8,
+        workers=4,
         patience=15, 
         optimizer='AdamW' 
     )
