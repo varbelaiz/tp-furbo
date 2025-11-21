@@ -10,7 +10,7 @@ def main():
     IMGSZ = 640
     BATCH_SIZE = 16 
     PROJECT_NAME = 'entrenamiento_cancha'
-    RUN_NAME = 'run_cloud_v1' # Le puse cloud para diferenciar
+    RUN_NAME = 'run_cloud_v1' 
 
     # Verificar dataset
     if not os.path.exists(DATA_YAML):
@@ -31,20 +31,26 @@ def main():
         batch=BATCH_SIZE,
         mosaic=0.0, 
         plots=True,
-        save=True,
+        
+        # --- SAVING CONFIGURATION ---
+        save=True,        # This automatically saves 'best.pt' and 'last.pt'
+        save_period=-1,   # -1 disables intermediate checkpoints (saves disk space)
+        # ----------------------------
+
         device=0, 
         project=PROJECT_NAME,
         name=RUN_NAME,
         exist_ok=True,
         workers=8,
-        patience=15, # Bajamos paciencia para ahorrar plata si se estanca
-        optimizer='AdamW' # A veces converge más rápido en Pose
+        patience=15, 
+        optimizer='AdamW' 
     )
     
     # Finalizar run de W&B
     wandb.finish()
 
     print("✅ Entrenamiento finalizado.")
+    print(f"📂 Modelos guardados en: {PROJECT_NAME}/{RUN_NAME}/weights/")
 
 if __name__ == '__main__':
     main()
