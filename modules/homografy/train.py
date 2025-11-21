@@ -31,6 +31,7 @@ def main():
         batch=BATCH_SIZE,
         mosaic=0.0, 
         plots=True,
+        amp=False,
         
         # --- SAVING CONFIGURATION ---
         save=True,        # This automatically saves 'best.pt' and 'last.pt'
@@ -41,7 +42,7 @@ def main():
         project=PROJECT_NAME,
         name=RUN_NAME,
         exist_ok=True,
-        workers=4,
+        workers=0,
         patience=15, 
         optimizer='AdamW' 
     )
