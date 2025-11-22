@@ -4,7 +4,7 @@ import wandb
 
 def main():
     # --- CONFIGURACIÓN ---
-    MODEL_NAME = 'yolov8n-pose.pt'
+    MODEL_NAME = 'yolov11n-pose.pt'
     DATA_YAML = 'soccernet.yaml'
     EPOCHS = 100
     IMGSZ = 640
@@ -26,7 +26,7 @@ def main():
         epochs=EPOCHS,
         imgsz=IMGSZ,
         batch=BATCH_SIZE,
-        mosaic=0.0, 
+        mosaic=1.0, 
         plots=True,
         amp=False,
         save=True,        # This automatically saves 'best.pt' and 'last.pt'
