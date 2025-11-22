@@ -1,12 +1,13 @@
-
-path: soccernet_dataset  # Relativo a donde ejecutes el comando yolo, o usa ruta absoluta /Users/tu_usuario/...
+# soccernet.yaml
+path: ./soccernet_dataset
 train: train/images
 val: valid/images
 test: test/images
 
-# Keypoints
-kpt_shape: [32, 3]
-flip_idx: [26, 27, 28, 29, 30, 31, 24, 25, 8, 19, 10, 11, 22, 13, 14, 15, 16, 17, 18, 9, 20, 21, 12, 23, 6, 7, 0, 1, 2, 3, 4, 5]
-
+# Classes
 names:
-  0: soccer-pitch
+  0: pitch
+
+# Keypoints
+kpt_shape: [32, 3] # [num_kpts, dim]
+flip_idx: [25, 26, 27, 28, 29, 30, 23, 24, 22, 18, 19, 20, 21, 13, 14, 15, 16, 17, 9, 10, 11, 12, 8, 6, 7, 0, 1, 2, 3, 4, 5, 31] # approximate flip map

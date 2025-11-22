@@ -21,20 +21,30 @@ MAPPING_DEFINITIONS = {
     5: ("Side line left", "Side line bottom"),
     6: ("Small rect. left main", "Small rect. left top"),
     7: ("Small rect. left main", "Small rect. left bottom"),
+    8: "Penalty mark left", # Point
     9: ("Big rect. left main", "Big rect. left top"),
+    10: ("Big rect. left main", "Small rect. left top"), # Virtual
+    11: ("Big rect. left main", "Small rect. left bottom"), # Virtual
     12: ("Big rect. left main", "Big rect. left bottom"),
-    14: ("Middle line", "Side line top"),
+    13: ("Middle line", "Side line top"),
+    14: ("Middle line", "Circle central"), # Top Intersection
+    15: "Center mark", # Point
+    16: ("Middle line", "Circle central"), # Bottom Intersection
     17: ("Middle line", "Side line bottom"),
-    19: ("Big rect. right main", "Big rect. right top"),
-    22: ("Big rect. right main", "Big rect. right bottom"),
-    24: ("Small rect. right main", "Small rect. right top"),
-    25: ("Small rect. right main", "Small rect. right bottom"),
-    26: ("Side line right", "Side line top"),
-    27: ("Side line right", "Big rect. right top"),
-    28: ("Side line right", "Small rect. right top"),
-    29: ("Side line right", "Small rect. right bottom"),
-    30: ("Side line right", "Big rect. right bottom"),
-    31: ("Side line right", "Side line bottom"),
+    18: ("Big rect. right main", "Big rect. right top"),
+    19: ("Big rect. right main", "Small rect. right top"), # Virtual
+    20: ("Big rect. right main", "Small rect. right bottom"), # Virtual
+    21: ("Big rect. right main", "Big rect. right bottom"),
+    22: "Penalty mark right", # Point
+    23: ("Small rect. right main", "Small rect. right top"),
+    24: ("Small rect. right main", "Small rect. right bottom"),
+    25: ("Side line right", "Side line top"),
+    26: ("Side line right", "Big rect. right top"),
+    27: ("Side line right", "Small rect. right top"),
+    28: ("Side line right", "Small rect. right bottom"),
+    29: ("Side line right", "Big rect. right bottom"),
+    30: ("Side line right", "Side line bottom"),
+    31: ("Middle line", "Circle central") # Fallback for circle edge if needed
 }
 
 # --- FUNCIONES MATEMÁTICAS ---
@@ -62,7 +72,7 @@ def check_and_download():
     else:
         print("✅ Los zips ya están descargados.")
 
-# --- PIPELINE OPTIMIZADO (Low Disk Space Mode) ---
+# --- PIPELINE OPTIMIZADO ---
 def process_pipeline_step(split_name):
     print(f"\n🚀 INICIANDO BLOQUE: {split_name.upper()}")
     
@@ -99,21 +109,35 @@ def process_pipeline_step(split_name):
             yolo_header = [0, 0.5, 0.5, 1.0, 1.0]
             keypoints = []
             
+            # Start Loop 0-31
             for i in range(32):
                 px, py, vis = 0.0, 0.0, 0
+                
                 if i in MAPPING_DEFINITIONS:
-                    l1, l2 = MAPPING_DEFINITIONS[i]
-                    if l1 in data and l2 in data:
-                        pt = intersect_lines(data[l1], data[l2])
-                        if pt:
-                            rx, ry = pt
-                            
-                            # Solo guardamos si está ESTRICTAMENTE dentro de la imagen [0, 1]
-                            if 0 <= rx <= 1.0 and 0 <= ry <= 1.0:
-                                px, py, vis = rx, ry, 2  # Visible y posición real
-                            else:
-                                # Fuera de imagen = No visible
-                                px, py, vis = 0.0, 0.0, 0 
+                    definition = MAPPING_DEFINITIONS[i]
+                    
+                    # LOGIC FOR SINGLE POINTS (e.g., Penalty Spot)
+                    if isinstance(definition, str):
+                        if definition in data:
+                            raw = data[definition]
+                            # JSON often has list of points [{"x":...}, {"x":...}]
+                            if isinstance(raw, list) and len(raw) > 0:
+                                pt = raw[0]
+                                if 'x' in pt and 'y' in pt:
+                                    if 0 <= pt['x'] <= 1.0 and 0 <= pt['y'] <= 1.0:
+                                        px, py, vis = pt['x'], pt['y'], 2
+
+                    # LOGIC FOR INTERSECTIONS (e.g., Corners)
+                    elif isinstance(definition, tuple):
+                        l1_name, l2_name = definition
+                        if l1_name in data and l2_name in data:
+                            # Your intersect_lines function works on lists of points
+                            # The JSON provides exactly that.
+                            pt = intersect_lines(data[l1_name], data[l2_name])
+                            if pt:
+                                rx, ry = pt
+                                if 0 <= rx <= 1.0 and 0 <= ry <= 1.0:
+                                    px, py, vis = rx, ry, 2
 
                 keypoints.extend([px, py, vis])
 
