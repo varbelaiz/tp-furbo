@@ -10,15 +10,12 @@ def main():
     IMGSZ = 640
     BATCH_SIZE = 8
     PROJECT_NAME = 'entrenamiento_cancha'
-    RUN_NAME = 'run_cloud_v1' 
+    RUN_NAME = 'run_cloud_v2' 
 
     # Verificar dataset
     if not os.path.exists(DATA_YAML):
         print(f"❌ ERROR: Falta {DATA_YAML}")
         return
-
-    # Iniciar W&B
-    wandb.init(project="homografia-cancha", name=RUN_NAME, job_type="training")
 
     print(f"🚀 Iniciando entrenamiento...")
 
@@ -32,12 +29,8 @@ def main():
         mosaic=0.0, 
         plots=True,
         amp=False,
-        
-        # --- SAVING CONFIGURATION ---
         save=True,        # This automatically saves 'best.pt' and 'last.pt'
-        save_period=-1,   # -1 disables intermediate checkpoints (saves disk space)
-        # ----------------------------
-
+        save_period=-1,   # -1 disables intermediate checkpoints
         device=0, 
         project=PROJECT_NAME,
         name=RUN_NAME,
@@ -46,9 +39,6 @@ def main():
         patience=15, 
         optimizer='AdamW' 
     )
-    
-    # Finalizar run de W&B
-    wandb.finish()
 
     print("✅ Entrenamiento finalizado.")
     print(f"📂 Modelos guardados en: {PROJECT_NAME}/{RUN_NAME}/weights/")
