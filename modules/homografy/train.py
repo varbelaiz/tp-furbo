@@ -10,7 +10,7 @@ def main():
     IMGSZ = 640
     BATCH_SIZE = 8
     PROJECT_NAME = 'entrenamiento_cancha'
-    RUN_NAME = 'run_cloud_v2' 
+    RUN_NAME = 'run_cloud_v3' 
 
     # Verificar dataset
     if not os.path.exists(DATA_YAML):
