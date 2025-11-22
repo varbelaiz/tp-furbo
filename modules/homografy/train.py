@@ -4,7 +4,7 @@ import wandb
 
 def main():
     # --- CONFIGURACIÓN ---
-    MODEL_NAME = 'yolov8x-pose.pt'
+    MODEL_NAME = 'yolov8n-pose.pt'
     DATA_YAML = 'soccernet.yaml'
     EPOCHS = 100
     IMGSZ = 640
