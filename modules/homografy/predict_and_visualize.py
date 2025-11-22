@@ -3,13 +3,12 @@ import cv2
 import numpy as np
 
 # --- CONFIGURACIÓN ---
-MODEL_PATH = 'entrenamiento_cancha/run_v1/weights/best.pt' 
+MODEL_PATH = 'best.pt' 
 VIDEO_PATH = '121364_0.mp4'  
 OUTPUT_PATH = 'resultado_cancha.mp4'
 CONF_THRESHOLD = 0.5 
 
 # --- DEFINICIÓN DEL ESQUELETO (QUÉ PUNTOS CONECTAN CON CUÁLES) ---
-# Basado en nuestra topología de 32 puntos para dibujar la cancha
 SKELETON_CONNECTIONS = [
     # Perímetro
     (0, 26), (0, 5), (5, 31), (26, 31), 

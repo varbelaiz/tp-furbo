@@ -107,10 +107,17 @@ def process_pipeline_step(split_name):
                         pt = intersect_lines(data[l1], data[l2])
                         if pt:
                             rx, ry = pt
-                            if -0.2 <= rx <= 1.2 and -0.2 <= ry <= 1.2:
-                                px, py, vis = max(0, min(1, rx)), max(0, min(1, ry)), 2
+                            
+                            # Solo guardamos si está ESTRICTAMENTE dentro de la imagen [0, 1]
+                            if 0 <= rx <= 1.0 and 0 <= ry <= 1.0:
+                                px, py, vis = rx, ry, 2  # Visible y posición real
+                            else:
+                                # Fuera de imagen = No visible
+                                px, py, vis = 0.0, 0.0, 0 
+
                 keypoints.extend([px, py, vis])
 
+            # Guardar solo si hay suficientes puntos para una homografía (mínimo 6)
             if sum(1 for v in keypoints[2::3] if v == 2) >= 6:
                 base_name = os.path.splitext(os.path.basename(json_path))[0]
                 
@@ -119,6 +126,7 @@ def process_pipeline_step(split_name):
                 with open(txt_path, 'w') as out_f:
                     out_f.write(" ".join(map(str, yolo_header + keypoints)))
                 
+                # Copiar Imagen
                 img_src = json_path.replace(".json", ".jpg")
                 if not os.path.exists(img_src): img_src = json_path.replace(".json", ".png")
                 
@@ -133,7 +141,7 @@ def process_pipeline_step(split_name):
 
     print(f"   ✅ {processed_count} imágenes procesadas correctamente.")
 
-    # 3. LIMPIEZA DE ESPACIO (Borrar la carpeta descomprimida raw)
+    # 3. LIMPIEZA DE ESPACIO
     print(f"   🧹 Liberando espacio: Borrando carpeta temporal {extract_path}...")
     if os.path.exists(extract_path):
         shutil.rmtree(extract_path)
@@ -141,14 +149,12 @@ def process_pipeline_step(split_name):
 
 
 if __name__ == "__main__":
-    # 1. Chequeo y Descarga de Zips
+    # 1. Chequeo y Descarga
     check_and_download()
     
-    # 2. Procesamiento Secuencial (Descomprime -> Procesa -> Borra Raw)
-    # El orden importa. Hacemos uno, terminamos y liberamos espacio antes de seguir.
+    # 2. Procesamiento Secuencial
     process_pipeline_step("train")
     process_pipeline_step("valid")
     process_pipeline_step("test")
-    # process_pipeline_step("challenge") # Opcional
     
     print("\n🎉 Dataset preparado exitosamente en './soccernet_dataset' (y disco limpio)")
