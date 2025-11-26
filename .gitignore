@@ -208,3 +208,6 @@ __marimo__/
 /path/to/SoccerNet/tracking-2023
 /path/to/SoccerNet/tracking
 /path
+experiments/snb_save/SoccerNetBall_challenge1/checkpoint_best.pt
+/experiments/snb_save/SoccerNetBall_challenge1
+/wandb
