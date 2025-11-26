@@ -155,6 +155,7 @@ venv.bak/
 /site
 /samples
 /data
+/segment-anything-2-real-time
 # mypy
 .mypy_cache/
 .dmypy.json
