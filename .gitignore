@@ -156,6 +156,12 @@ venv.bak/
 /samples
 /data
 /segment-anything-2-real-time
+/runs
+
+# Models
+yolo11m.pt
+yolo11x.pt
+
 # mypy
 .mypy_cache/
 .dmypy.json
