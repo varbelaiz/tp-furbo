@@ -162,6 +162,7 @@ venv.bak/
 yolo11m.pt
 yolo11x.pt
 
+/videos
 # mypy
 .mypy_cache/
 .dmypy.json
