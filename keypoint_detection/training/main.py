@@ -164,8 +164,9 @@ def main():
             config_params['pose_loss_weight'] = args.pose_loss_weight
         if args.data is not None:
             config_params['dataset_yaml_path'] = args.data
-        if args.resume:
-            config_params['resume'] = args.resume
+        
+        config_params['resume'] = args.resume
+
         if args.freeze:
             config_params['freeze'] = args.freeze
         if args.single_cls:

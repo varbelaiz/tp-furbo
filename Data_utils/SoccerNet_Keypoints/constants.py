@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 
-dataset_dir = r"F:\Datasets\SoccerNet\Data"
-calibration_dir = Path(dataset_dir) / 'calibration'
-soccernet_password = "<password>"
+dataset_dir = Path("Datasets")
+calibration_dir = dataset_dir / "SoccerNet" / "Data" / "calibration"
+soccernet_password = "<tu_password>"
 
 # Keypoint Detection Constants
 
