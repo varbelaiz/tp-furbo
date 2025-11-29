@@ -38,6 +38,8 @@ class TacticalPipeline:
         self.processing_pipeline = ProcessingPipeline()
         self.homography_transformer = HomographyTransformer()
         self.pitch_config = SoccerPitchConfiguration()
+        self.prev_H = None
+        self.smoothing_alpha = 0.5
         
     def initialize_models(self):
         """Initialize keypoint and detection models."""
@@ -78,7 +80,23 @@ class TacticalPipeline:
         Returns:
             ViewTransformer object for frame-to-pitch transformation
         """
-        return self.homography_transformer.transform_to_pitch_keypoints(detected_keypoints)
+        view_transformer = self.homography_transformer.transform_to_pitch_keypoints(detected_keypoints)
+        # -- temporal smoothing --
+        if view_transformer is not None and view_transformer.homography is not None:
+            H = view_transformer.homography
+
+            if self.prev_H is None:
+                self.prev_H = H
+            else:
+                # exponential moving average
+                H = self.smoothing_alpha * H + (1 - self.smoothing_alpha) * self.prev_H
+                self.prev_H = H
+
+            # overwrite transformer matrices
+            view_transformer.homography = H
+            view_transformer.inv_homography = np.linalg.inv(H)
+
+        return view_transformer
     
     def transform_detections_to_pitch(self, detections: sv.Detections, 
                                     view_transformer: ViewTransformer) -> np.ndarray:
