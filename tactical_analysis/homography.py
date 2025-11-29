@@ -8,6 +8,7 @@ import supervision as sv
 from sports.common.view import ViewTransformer
 from sports.annotators.soccer import draw_pitch
 from sports.configs.soccer import SoccerPitchConfiguration
+import cv2
 
 from keypoint_detection.keypoint_constants import KEYPOINT_NAMES
 
@@ -102,11 +103,27 @@ class HomographyTransformer:
         pitch_indices = self.our_to_sports_mapping[filter_mask]
         pitch_reference_points = self.all_pitch_points[pitch_indices]
         
+        # NEW: geometric outlier removal
+        # compute centroid
+        centroid = np.mean(frame_reference_points, axis=0)
+
+        dists = np.linalg.norm(frame_reference_points - centroid, axis=1)
+        mad = np.median(np.abs(dists - np.median(dists)))
+
+        # keep only points within 3*MAD
+        geo_mask = dists < (3 * mad)
+        frame_reference_points = frame_reference_points[geo_mask]
+        pitch_reference_points = pitch_reference_points[geo_mask]
+
+        if len(frame_reference_points) < 4:
+            print("After geometric filtering, insufficient keypoints")
+            return None, None, None
+        
         return frame_reference_points, pitch_reference_points, filter_mask
     
     def _create_view_transformer(self, source_points, target_points):
         """
-        Create ViewTransformer from source to target points.
+        Create ViewTransformer with RANSAC-based homography estimation.
         
         Args:
             source_points: Source coordinate points
@@ -115,14 +132,36 @@ class HomographyTransformer:
         Returns:
             ViewTransformer object or None if creation fails
         """
+        # try:
+        #     view_transformer = ViewTransformer(
+        #         source=source_points,
+        #         target=target_points
+        #     )
+        #     return view_transformer
+        # except ValueError as e:
+        #     print(f"Error creating ViewTransformer: {e}")
+        #     return None
         try:
-            view_transformer = ViewTransformer(
-                source=source_points,
-                target=target_points
-            )
+            # Convert to float32 for OpenCV
+            src = np.asarray(source_points, dtype=np.float32)
+            dst = np.asarray(target_points, dtype=np.float32)
+
+            # Homography with RANSAC 
+            H, inliers = cv2.findHomography(src, dst, cv2.RANSAC, 3.0)
+
+            if H is None:
+                print("Homography estimation failed (RANSAC returned None)")
+                return None
+
+            # Create ViewTransformer manually using matrix
+            view_transformer = ViewTransformer()
+            view_transformer.homography = H
+            view_transformer.inv_homography = np.linalg.inv(H)
+
             return view_transformer
-        except ValueError as e:
-            print(f"Error creating ViewTransformer: {e}")
+
+        except Exception as e:
+            print(f"Error creating RANSAC-based ViewTransformer: {e}")
             return None
 
     def transform_to_frame_keypoints(self, detected_keypoints):
