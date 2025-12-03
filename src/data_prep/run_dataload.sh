@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Build the 29-keypoint dataset from the raw SoccerNet calibration data. Run it from the repository root:
+# Build both keypoint datasets (29 KP and 57 KP) from the raw SoccerNet
+# calibration data. Run it from the repository root:
 #
 #     bash src/data_prep/run_dataload.sh
 #
@@ -8,7 +9,7 @@
 # Stop the script on any error
 set -e
 
-echo "STARTING THE 29 KP PIPELINE..."
+echo "STARTING FULL PIPELINE (29 KP + 57 KP)..."
 
 
 # 0. PATH CONFIGURATION
@@ -105,7 +106,7 @@ finalize_dataset() {
 # 2. GENERATE THE 29-POINT DATASET
 
 echo "---------------------------------------"
-echo "Generating the 29 KP dataset"
+echo "RUN 1: generating the original dataset (29 KP)"
 echo "---------------------------------------"
 echo "Running process_images.py..."
 
@@ -115,9 +116,23 @@ python -m src.data_prep.keypoints.datatools_29.process_images
 finalize_dataset "$BASE_DATA_DIR/unified_output" "29"
 
 
+# 3. GENERATE THE 57-POINT DATASET
+
+echo "---------------------------------------"
+echo "RUN 2: generating the extended dataset (57 KP)"
+echo "---------------------------------------"
+echo "Running process_images_57.py..."
+
+python -m src.data_prep.keypoints.datatools_57.process_images_57
+
+# Post-process the output (which goes to unified_output_57)
+finalize_dataset "$BASE_DATA_DIR/unified_output_57" "57"
+
+
 # 4. DONE
 echo "---------------------------------------"
 echo "PIPELINE COMPLETE"
 echo "---------------------------------------"
-echo "The dataset is ready in:"
-echo "   29 KP: $BASE_DATA_DIR/unified_output"
+echo "The datasets are ready in:"
+echo "   1. 29 KP: $BASE_DATA_DIR/unified_output"
+echo "   2. 57 KP: $BASE_DATA_DIR/unified_output_57"
