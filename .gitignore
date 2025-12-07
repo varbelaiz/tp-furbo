@@ -1,6 +1,6 @@
 # ---- Project specific ----
 
-# Datasets are never committed
+# Datasets: regenerated with src/data_prep/run_dataload.sh, never committed
 data/**
 !data/**/
 !data/**/README.md
@@ -8,6 +8,17 @@ data/**
 # Trained weights and live training output
 runs/
 *.pt
+
+# Generated videos and figures
+outputs/**
+!outputs/link_to_videos.txt
+
+# Segment Anything 2, installed separately
+segment-anything-2-real-time/
+
+# Caches
+*.pkl
+tracking_cache.pkl
 
 
 # ---- Python ----
